@@ -3,18 +3,25 @@ class User {
         this.userId = userId;
         this.userName = userName;
         this.userPassword = userPassword;
-        this.allReceipts = []; // Array of class Receipt
+        this.allPostedItems = []; // Array of Items where User is owner
+        this.allRentingItems = []; // Array of Items wher User is renting
+        this.allReceipts = []; // Array of Receipts (both owner receipt and renter receipt)
     }
 
     // Behaviour methods
     postItem(item) {
         item.setOwnerId = this.getUserId();
         item.postItem();
+
+        this.allPostedItems.push(item);
     }
 
     rentItem(item) {
         item.setRenterId = this.getUserId();
         item.rentItem();
+
+        this.allRentingItems.push(item);
+
     }
 
     // Setters and getters

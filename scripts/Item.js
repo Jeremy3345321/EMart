@@ -30,7 +30,7 @@ class Item {
         
     }
 
-    rentItem() {
+    rentItem(receipt) {
         this.isRented = true;
         Database.updateItem(this)
     }
