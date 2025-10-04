@@ -7,8 +7,13 @@ class User {
 
     // Behaviour methods
     postItem(item) {
-        item.set
+        item.setOwnerId = this.getUserId();
         item.postItem();
+    }
+
+    rentItem(item) {
+        item.setRenterId = this.getUserId();
+        item.rentItem();
     }
 
     // Setters and getters
