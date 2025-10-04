@@ -3,6 +3,7 @@ class User {
         this.userId = userId;
         this.userName = userName;
         this.userPassword = userPassword;
+        this.allReceipts = []; // Array of class Receipt
     }
 
     // Behaviour methods
