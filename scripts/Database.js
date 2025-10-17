@@ -215,6 +215,187 @@ class Database {
         }
     }
 
+    // MESSAGE METHODS
+    static async addMessage(message) {
+        try {
+            const [result] = await this.pool.execute(
+                'INSERT INTO messages (from_id, to_id, content, timestamp, is_read) VALUES (?, ?, ?, ?, ?)',
+                [
+                    message.getFromId(), 
+                    message.getToId(), 
+                    message.getContent(), 
+                    message.getTimestamp(), 
+                    message.getIsRead()
+                ]
+            );
+            message.setMessageId(result.insertId);
+            console.log(`Message sent from user ${message.getFromId()} to user ${message.getToId()}`);
+            return message;
+        } catch (error) {
+            console.error('Error adding message:', error.message);
+            throw error;
+        }
+    }
+
+    static async getMessageById(messageId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM messages WHERE message_id = ?',
+                [messageId]
+            );
+            
+            if (rows.length > 0) {
+                const message = new Message(
+                    rows[0].message_id,
+                    rows[0].from_id,
+                    rows[0].to_id,
+                    rows[0].content
+                );
+                message.setTimestamp(rows[0].timestamp);
+                message.setIsRead(rows[0].is_read);
+                return message;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting message:', error.message);
+            throw error;
+        }
+    }
+
+    static async getConversation(userId1, userId2) {
+        try {
+            const [rows] = await this.pool.execute(
+                `SELECT * FROM messages 
+                WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)
+                ORDER BY timestamp ASC`,
+                [userId1, userId2, userId2, userId1]
+            );
+            
+            return rows.map(row => {
+                const message = new Message(
+                    row.message_id,
+                    row.from_id,
+                    row.to_id,
+                    row.content
+                );
+                message.setTimestamp(row.timestamp);
+                message.setIsRead(row.is_read);
+                return message;
+            });
+        } catch (error) {
+            console.error('Error getting conversation:', error.message);
+            throw error;
+        }
+    }
+
+    static async getUserMessages(userId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM messages WHERE from_id = ? OR to_id = ? ORDER BY timestamp DESC',
+                [userId, userId]
+            );
+            
+            return rows.map(row => {
+                const message = new Message(
+                    row.message_id,
+                    row.from_id,
+                    row.to_id,
+                    row.content
+                );
+                message.setTimestamp(row.timestamp);
+                message.setIsRead(row.is_read);
+                return message;
+            });
+        } catch (error) {
+            console.error('Error getting user messages:', error.message);
+            throw error;
+        }
+    }
+
+    static async getUnreadMessages(userId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM messages WHERE to_id = ? AND is_read = FALSE ORDER BY timestamp DESC',
+                [userId]
+            );
+            
+            return rows.map(row => {
+                const message = new Message(
+                    row.message_id,
+                    row.from_id,
+                    row.to_id,
+                    row.content
+                );
+                message.setTimestamp(row.timestamp);
+                message.setIsRead(row.is_read);
+                return message;
+            });
+        } catch (error) {
+            console.error('Error getting unread messages:', error.message);
+            throw error;
+        }
+    }
+
+    static async markMessageAsRead(messageId) {
+        try {
+            await this.pool.execute(
+                'UPDATE messages SET is_read = TRUE WHERE message_id = ?',
+                [messageId]
+            );
+            console.log(`Message ${messageId} marked as read`);
+        } catch (error) {
+            console.error('Error marking message as read:', error.message);
+            throw error;
+        }
+    }
+
+    static async markConversationAsRead(userId, otherUserId) {
+        try {
+            await this.pool.execute(
+                'UPDATE messages SET is_read = TRUE WHERE from_id = ? AND to_id = ?',
+                [otherUserId, userId]
+            );
+            console.log(`Conversation marked as read`);
+        } catch (error) {
+            console.error('Error marking conversation as read:', error.message);
+            throw error;
+        }
+    }
+
+    static async deleteMessage(messageId) {
+        try {
+            await this.pool.execute('DELETE FROM messages WHERE message_id = ?', [messageId]);
+            console.log('Message deleted');
+        } catch (error) {
+            console.error('Error deleting message:', error.message);
+            throw error;
+        }
+    }
+
+    static async getUserConversations(userId) {
+        try {
+            // Get unique users that the given user has chatted with
+            const [rows] = await this.pool.execute(
+                `SELECT DISTINCT 
+                    CASE 
+                        WHEN from_id = ? THEN to_id 
+                        ELSE from_id 
+                    END as other_user_id,
+                    MAX(timestamp) as last_message_time
+                FROM messages 
+                WHERE from_id = ? OR to_id = ?
+                GROUP BY other_user_id
+                ORDER BY last_message_time DESC`,
+                [userId, userId, userId]
+            );
+            
+            return rows;
+        } catch (error) {
+            console.error('Error getting user conversations:', error.message);
+            throw error;
+        }
+    }
+
     // Close all connections
     static async close() {
         if (this.pool) {
