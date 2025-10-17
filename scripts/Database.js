@@ -215,6 +215,286 @@ class Database {
         }
     }
 
+    // Receipt methods
+    static async addReceipt(receipt) {
+        try {
+            const [result] = await this.pool.execute(
+                'INSERT INTO receipts (item_id, owner_id, renter_id, rental_start_date, rental_end_date, rental_price, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [
+                    receipt.itemId,
+                    receipt.ownerId,
+                    receipt.renterId,
+                    receipt.rentalStartDate,
+                    receipt.rentalEndDate,
+                    receipt.rentalPrice,
+                    receipt.status
+                ]
+            );
+            receipt.receiptId = result.insertId;
+            console.log(`Receipt created with ID: ${receipt.receiptId}`);
+            return receipt;
+        } catch (error) {
+            console.error('Error adding receipt:', error.message);
+            throw error;
+        }
+    }
+
+    static async getReceiptById(receiptId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE receipt_id = ?',
+                [receiptId]
+            );
+            
+            if (rows.length > 0) {
+                const receipt = new Receipt();
+                receipt.receiptId = rows[0].receipt_id;
+                receipt.itemId = rows[0].item_id;
+                receipt.ownerId = rows[0].owner_id;
+                receipt.renterId = rows[0].renter_id;
+                receipt.rentalStartDate = rows[0].rental_start_date;
+                receipt.rentalEndDate = rows[0].rental_end_date;
+                receipt.rentalPrice = rows[0].rental_price;
+                receipt.status = rows[0].status;
+                receipt.createdAt = rows[0].created_at;
+                return receipt;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error getting receipt:', error.message);
+            throw error;
+        }
+    }
+
+    static async getReceiptsByItem(itemId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE item_id = ? ORDER BY created_at DESC',
+                [itemId]
+            );
+            
+            return rows.map(row => {
+                const receipt = new Receipt();
+                receipt.receiptId = row.receipt_id;
+                receipt.itemId = row.item_id;
+                receipt.ownerId = row.owner_id;
+                receipt.renterId = row.renter_id;
+                receipt.rentalStartDate = row.rental_start_date;
+                receipt.rentalEndDate = row.rental_end_date;
+                receipt.rentalPrice = row.rental_price;
+                receipt.status = row.status;
+                receipt.createdAt = row.created_at;
+                return receipt;
+            });
+        } catch (error) {
+            console.error('Error getting receipts by item:', error.message);
+            throw error;
+        }
+    }
+
+    static async getReceiptsByOwner(ownerId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE owner_id = ? ORDER BY created_at DESC',
+                [ownerId]
+            );
+            
+            return rows.map(row => {
+                const receipt = new Receipt();
+                receipt.receiptId = row.receipt_id;
+                receipt.itemId = row.item_id;
+                receipt.ownerId = row.owner_id;
+                receipt.renterId = row.renter_id;
+                receipt.rentalStartDate = row.rental_start_date;
+                receipt.rentalEndDate = row.rental_end_date;
+                receipt.rentalPrice = row.rental_price;
+                receipt.status = row.status;
+                receipt.createdAt = row.created_at;
+                return receipt;
+            });
+        } catch (error) {
+            console.error('Error getting receipts by owner:', error.message);
+            throw error;
+        }
+    }
+
+    static async getReceiptsByRenter(renterId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE renter_id = ? ORDER BY created_at DESC',
+                [renterId]
+            );
+            
+            return rows.map(row => {
+                const receipt = new Receipt();
+                receipt.receiptId = row.receipt_id;
+                receipt.itemId = row.item_id;
+                receipt.ownerId = row.owner_id;
+                receipt.renterId = row.renter_id;
+                receipt.rentalStartDate = row.rental_start_date;
+                receipt.rentalEndDate = row.rental_end_date;
+                receipt.rentalPrice = row.rental_price;
+                receipt.status = row.status;
+                receipt.createdAt = row.created_at;
+                return receipt;
+            });
+        } catch (error) {
+            console.error('Error getting receipts by renter:', error.message);
+            throw error;
+        }
+    }
+
+    static async getActiveReceipts() {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE status = ? ORDER BY created_at DESC',
+                [Receipt.Status.ACTIVE]
+            );
+            
+            return rows.map(row => {
+                const receipt = new Receipt();
+                receipt.receiptId = row.receipt_id;
+                receipt.itemId = row.item_id;
+                receipt.ownerId = row.owner_id;
+                receipt.renterId = row.renter_id;
+                receipt.rentalStartDate = row.rental_start_date;
+                receipt.rentalEndDate = row.rental_end_date;
+                receipt.rentalPrice = row.rental_price;
+                receipt.status = row.status;
+                receipt.createdAt = row.created_at;
+                return receipt;
+            });
+        } catch (error) {
+            console.error('Error getting active receipts:', error.message);
+            throw error;
+        }
+    }
+
+    static async getReceiptsByStatus(status) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE status = ? ORDER BY created_at DESC',
+                [status]
+            );
+            
+            return rows.map(row => {
+                const receipt = new Receipt();
+                receipt.receiptId = row.receipt_id;
+                receipt.itemId = row.item_id;
+                receipt.ownerId = row.owner_id;
+                receipt.renterId = row.renter_id;
+                receipt.rentalStartDate = row.rental_start_date;
+                receipt.rentalEndDate = row.rental_end_date;
+                receipt.rentalPrice = row.rental_price;
+                receipt.status = row.status;
+                receipt.createdAt = row.created_at;
+                return receipt;
+            });
+        } catch (error) {
+            console.error('Error getting receipts by status:', error.message);
+            throw error;
+        }
+    }
+
+    static async updateReceipt(receipt) {
+        try {
+            await this.pool.execute(
+                'UPDATE receipts SET item_id = ?, owner_id = ?, renter_id = ?, rental_start_date = ?, rental_end_date = ?, rental_price = ?, status = ? WHERE receipt_id = ?',
+                [
+                    receipt.itemId,
+                    receipt.ownerId,
+                    receipt.renterId,
+                    receipt.rentalStartDate,
+                    receipt.rentalEndDate,
+                    receipt.rentalPrice,
+                    receipt.status,
+                    receipt.receiptId
+                ]
+            );
+            console.log(`Receipt ${receipt.receiptId} updated`);
+        } catch (error) {
+            console.error('Error updating receipt:', error.message);
+            throw error;
+        }
+    }
+
+    static async updateReceiptStatus(receiptId, status) {
+        try {
+            await this.pool.execute(
+                'UPDATE receipts SET status = ? WHERE receipt_id = ?',
+                [status, receiptId]
+            );
+            console.log(`Receipt ${receiptId} status updated to ${status}`);
+        } catch (error) {
+            console.error('Error updating receipt status:', error.message);
+            throw error;
+        }
+    }
+
+    static async deleteReceipt(receiptId) {
+        try {
+            await this.pool.execute('DELETE FROM receipts WHERE receipt_id = ?', [receiptId]);
+            console.log('Receipt deleted');
+        } catch (error) {
+            console.error('Error deleting receipt:', error.message);
+            throw error;
+        }
+    }
+
+    static async getOverdueReceipts() {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM receipts WHERE status = ? AND rental_end_date < NOW() ORDER BY rental_end_date ASC',
+                [Receipt.Status.ACTIVE]
+            );
+            
+            return rows.map(row => {
+                const receipt = new Receipt();
+                receipt.receiptId = row.receipt_id;
+                receipt.itemId = row.item_id;
+                receipt.ownerId = row.owner_id;
+                receipt.renterId = row.renter_id;
+                receipt.rentalStartDate = row.rental_start_date;
+                receipt.rentalEndDate = row.rental_end_date;
+                receipt.rentalPrice = row.rental_price;
+                receipt.status = row.status;
+                receipt.createdAt = row.created_at;
+                return receipt;
+            });
+        } catch (error) {
+            console.error('Error getting overdue receipts:', error.message);
+            throw error;
+        }
+    }
+
+    static async getTotalEarningsByOwner(ownerId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT SUM(rental_price) as total_earnings FROM receipts WHERE owner_id = ? AND status = ?',
+                [ownerId, Receipt.Status.COMPLETED]
+            );
+            
+            return rows[0].total_earnings || 0;
+        } catch (error) {
+            console.error('Error getting total earnings:', error.message);
+            throw error;
+        }
+    }
+
+    static async getTotalSpendingByRenter(renterId) {
+        try {
+            const [rows] = await this.pool.execute(
+                'SELECT SUM(rental_price) as total_spending FROM receipts WHERE renter_id = ? AND status = ?',
+                [renterId, Receipt.Status.COMPLETED]
+            );
+            
+            return rows[0].total_spending || 0;
+        } catch (error) {
+            console.error('Error getting total spending:', error.message);
+            throw error;
+        }
+    }
+
     // MESSAGE METHODS
     static async addMessage(message) {
         try {
