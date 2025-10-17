@@ -1,6 +1,6 @@
 // Chat functionalities of User
 
-class UserWithChat extends User {
+class UserChat extends User {
     constructor(userId = null, userName = null, userPassword = null) {
         super(userId, userName, userPassword);
         this.conversations = []; // Array of user IDs they've chatted with
