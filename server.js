@@ -10,7 +10,7 @@ const PORT = 3000;
 // Middleware
 app.use(express.json());
 app.use(cors());
-app.use(express.static('webpages')); // Serve static files (HTML, CSS, JS, images)
+app.use(express.static('public')); // Serve static files (HTML, CSS, JS, images)
 
 // Database configuration
 const dbConfig = {
@@ -38,17 +38,17 @@ pool.getConnection()
 
 // Serve login page as default
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'webpages', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Serve signup page
 app.get('/signup', (req, res) => {
-    res.sendFile(path.join(__dirname, 'webpages', 'signup.html'));
+    res.sendFile(path.join(__dirname, 'public', 'signup.html'));
 });
 
 // Serve dashboard page
 app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'webpages', 'dashboard.html'));
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 // ==================== USER API ROUTES ====================
