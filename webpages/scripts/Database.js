@@ -6,7 +6,7 @@ const dbConfig = {
     user: 'root',
     password: '', 
     database: 'e_mart',
-    port: 3306
+    port: 3000
 };
 
 class Database {
