@@ -34,39 +34,6 @@ class Item {
         this.isRented = true;
         Database.updateItem(this)
     }
-
-    // Setters and getters
-    getItemId() {
-        return this.itemId;
-    }
-
-    setItemId(value) {
-        this.itemId = value;
-    }
-
-    getItemName() {
-        return this.itemName;
-    }
-
-    setItemName(value) {
-        this.itemName = value;
-    }
-
-    getOwnerId() {
-        return this.ownerId;
-    }
-
-    setOwnerId(value) {
-        this.ownerId = value;
-    }
-
-    getRenterId() {
-        return this.renterId;
-    }
-
-    setRenterId(value) {
-        this.renterId = value;
-    }
 }
 
 /*

@@ -1,0 +1,245 @@
+/* signup.css */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+}
+
+.left-section {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff;
+    padding: 40px;
+}
+
+.right-section {
+    flex: 1;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+}
+
+.hero-image {
+    max-width: 100%;
+    max-height: 90%;
+    object-fit: contain;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.signup-container {
+    width: 100%;
+    max-width: 400px;
+}
+
+.app-name {
+    font-size: 48px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 40px;
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+.signup-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 16px 50px 16px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    background-color: #f8f9fa;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input-group .icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+}
+
+.input-group input:focus + .icon {
+    color: #667eea;
+}
+
+.btn {
+    padding: 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-signin {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    margin-top: 8px;
+}
+
+.btn-signin:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-signin:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-have-account {
+    background-color: #ffffff;
+    color: #333;
+    border: 2px solid #d0d0d0;
+}
+
+.btn-have-account:hover {
+    background-color: #f8f9fa;
+    border-color: #b0b0b0;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Password strength indicator */
+.password-strength {
+    height: 4px;
+    border-radius: 2px;
+    margin-top: -8px;
+    transition: all 0.3s ease;
+}
+
+.password-strength.weak {
+    background-color: #ff4444;
+    width: 33%;
+}
+
+.password-strength.medium {
+    background-color: #ffaa00;
+    width: 66%;
+}
+
+.password-strength.strong {
+    background-color: #00cc66;
+    width: 100%;
+}
+
+/* Validation messages */
+.validation-message {
+    font-size: 12px;
+    color: #ff4444;
+    margin-top: -8px;
+    display: none;
+}
+
+.validation-message.show {
+    display: block;
+}
+
+/* Responsive design */
+@media (max-width: 968px) {
+    .container {
+        flex-direction: column-reverse;
+    }
+
+    .left-section {
+        flex: 1;
+    }
+
+    .right-section {
+        flex: 0;
+        padding: 20px;
+        min-height: 200px;
+    }
+
+    .hero-image {
+        max-height: 150px;
+    }
+
+    .app-name {
+        font-size: 36px;
+        margin-bottom: 30px;
+    }
+}
+
+@media (max-width: 480px) {
+    .signup-container {
+        max-width: 100%;
+    }
+
+    .app-name {
+        font-size: 32px;
+    }
+
+    .input-group input {
+        padding: 14px 45px 14px 14px;
+        font-size: 14px;
+    }
+
+    .btn {
+        padding: 14px;
+        font-size: 14px;
+    }
+}
+
+/* Animation for form elements */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.signup-form > * {
+    animation: slideIn 0.5s ease forwards;
+}
+
+.signup-form > *:nth-child(1) { animation-delay: 0.1s; }
+.signup-form > *:nth-child(2) { animation-delay: 0.2s; }
+.signup-form > *:nth-child(3) { animation-delay: 0.3s; }
+.signup-form > *:nth-child(4) { animation-delay: 0.4s; }
+.signup-form > *:nth-child(5) { animation-delay: 0.5s; }
+.signup-form > *:nth-child(6) { animation-delay: 0.6s; }

@@ -4,40 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EMart - Sign Up</title>
-    <link rel="stylesheet" href="styles.css">
-    <style>
-        .signup-container {
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .signup-form {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        
-        .btn-signin {
-            background-color: #a0a0a0;
-            color: #ffffff;
-            margin-top: 8px;
-        }
-        
-        .btn-signin:hover {
-            background-color: #8a8a8a;
-        }
-        
-        .btn-have-account {
-            background-color: #ffffff;
-            color: #333;
-            border: 2px solid #d0d0d0;
-        }
-        
-        .btn-have-account:hover {
-            background-color: #f8f9fa;
-            border-color: #b0b0b0;
-        }
-    </style>
+    <link rel="stylesheet" href="styles/signup.css">
 </head>
 <body>
     <div class="container">
@@ -54,8 +21,8 @@
                         <input type="email" id="email" name="email" placeholder="Email" required>
                         <span class="icon">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="12" cy="7" r="4"></circle>
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                <polyline points="22,6 12,13 2,6"></polyline>
                             </svg>
                         </span>
                     </div>
@@ -81,16 +48,16 @@
                     </div>
                     
                     <button type="submit" class="btn btn-signin">SIGN UP</button>
-                    <button type="button" class="btn btn-have-account" onclick="window.location.href='index.html'">Have an account?</button>
+                    <button type="button" class="btn btn-have-account" onclick="window.location.href='/'">Have an account?</button>
                 </form>
             </div>
         </div>
         
         <div class="right-section">
-            <img src="itemstocks.jpg" alt="EMart Inventory" class="hero-image">
+            <img src="images/itemstocks.jpg" alt="EMart Inventory" class="hero-image">
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="scripts/app.js"></script>
 </body>
 </html>
