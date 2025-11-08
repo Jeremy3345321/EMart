@@ -6,8 +6,8 @@ const cors = require('cors');
 const path = require('path');
 
 // Import custom classes
-const Database = require('./Database');
-const User = require('./User');
+const Database = require('./classes/Database');
+const User = require('./classes/User');
 
 const app = express();
 const PORT = 3000;
