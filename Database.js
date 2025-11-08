@@ -50,7 +50,7 @@ class Database {
             );
             
             if (rows.length > 0) {
-                const User = require('./User');  // FIXED: Changed from './public/scripts/User'
+                const User = require('./User');  
                 return new User(
                     rows[0].user_id, 
                     rows[0].user_name, 
@@ -74,7 +74,7 @@ class Database {
             );
             
             if (rows.length > 0) {
-                const User = require('./User');  // FIXED: Changed from './public/scripts/User'
+                const User = require('./User');  
                 return new User(
                     rows[0].user_id, 
                     rows[0].user_name, 
@@ -98,7 +98,7 @@ class Database {
             );
             
             if (rows.length > 0) {
-                const User = require('./User');  // FIXED: Changed from './public/scripts/User'
+                const User = require('./User');  
                 return new User(
                     rows[0].user_id, 
                     rows[0].user_name, 
@@ -165,7 +165,7 @@ class Database {
             );
             
             if (rows.length > 0) {
-                const Item = require('./Item');  // FIXED: Changed from './public/scripts/Item'
+                const Item = require('./Item');  
                 const item = new Item(
                     rows[0].item_id,
                     rows[0].item_name,
@@ -187,7 +187,7 @@ class Database {
         try {
             await this.initialize();
             const [rows] = await this.pool.execute('SELECT * FROM items');
-            const Item = require('./Item');  // FIXED: Changed from './public/scripts/Item'
+            const Item = require('./Item'); 
             return rows.map(row => {
                 const item = new Item(row.item_id, row.item_name, row.owner_id, row.renter_id);
                 item.isRenting = row.is_renting;
@@ -206,7 +206,7 @@ class Database {
             const [rows] = await this.pool.execute(
                 'SELECT * FROM items WHERE is_renting = TRUE AND is_rented = FALSE'
             );
-            const Item = require('./Item');  // FIXED: Changed from './public/scripts/Item'
+            const Item = require('./Item'); 
             return rows.map(row => {
                 const item = new Item(row.item_id, row.item_name, row.owner_id, row.renter_id);
                 item.isRenting = row.is_renting;
@@ -226,7 +226,7 @@ class Database {
                 'SELECT * FROM items WHERE owner_id = ?',
                 [ownerId]
             );
-            const Item = require('./Item');  // FIXED: Changed from './public/scripts/Item'
+            const Item = require('./Item'); 
             return rows.map(row => {
                 const item = new Item(row.item_id, row.item_name, row.owner_id, row.renter_id);
                 item.isRenting = row.is_renting;
@@ -246,7 +246,7 @@ class Database {
                 'SELECT * FROM items WHERE renter_id = ?',
                 [renterId]
             );
-            const Item = require('./Item');  // FIXED: Changed from './public/scripts/Item'
+            const Item = require('./Item'); 
             return rows.map(row => {
                 const item = new Item(row.item_id, row.item_name, row.owner_id, row.renter_id);
                 item.isRenting = row.is_renting;
@@ -294,7 +294,7 @@ class Database {
                 [ownerId]
             );
             
-            const Receipt = require('./Receipt');  // FIXED: Changed from './public/scripts/Receipt'
+            const Receipt = require('./Receipt'); 
             return rows.map(row => {
                 const receipt = new Receipt();
                 receipt.receiptId = row.receipt_id;
@@ -322,7 +322,7 @@ class Database {
                 [renterId]
             );
             
-            const Receipt = require('./Receipt');  // FIXED: Changed from './public/scripts/Receipt'
+            const Receipt = require('./Receipt');  
             return rows.map(row => {
                 const receipt = new Receipt();
                 receipt.receiptId = row.receipt_id;
