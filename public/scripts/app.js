@@ -1,3 +1,4 @@
+// app.js
 // API Base URL
 const API_URL = 'http://localhost:3000/api';
 
