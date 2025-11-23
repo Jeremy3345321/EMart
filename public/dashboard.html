@@ -4,253 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EMart - Shop</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #f5f5f5;
-        }
-
-        /* Header */
-        .header {
-            background-color: #232f3e;
-            padding: 15px 30px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .logo {
-            font-size: 24px;
-            font-weight: 700;
-            color: #ffffff;
-            text-decoration: none;
-            letter-spacing: -0.5px;
-        }
-
-        .search-container {
-            flex: 1;
-            max-width: 800px;
-            position: relative;
-        }
-
-        .search-box {
-            width: 100%;
-            padding: 12px 50px 12px 15px;
-            border: none;
-            border-radius: 4px;
-            font-size: 15px;
-            outline: none;
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #666;
-            pointer-events: none;
-        }
-
-        .header-icons {
-            display: flex;
-            gap: 15px;
-            margin-left: auto;
-        }
-
-        .icon-btn {
-            background-color: transparent;
-            border: none;
-            color: #ffffff;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .icon-btn:hover {
-            background-color: rgba(255,255,255,0.1);
-        }
-
-        /* Category Navigation */
-        .category-nav {
-            background-color: #37475a;
-            padding: 0;
-            overflow-x: auto;
-            white-space: nowrap;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .category-nav::-webkit-scrollbar {
-            height: 6px;
-        }
-
-        .category-nav::-webkit-scrollbar-track {
-            background: #2c3a4a;
-        }
-
-        .category-nav::-webkit-scrollbar-thumb {
-            background: #555;
-            border-radius: 3px;
-        }
-
-        .category-item {
-            display: inline-block;
-            padding: 15px 20px;
-            color: #ffffff;
-            text-decoration: none;
-            transition: background-color 0.2s;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .category-item:hover {
-            background-color: #475866;
-        }
-
-        /* Main Content */
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
-
-        .section-title {
-            font-size: 24px;
-            font-weight: 600;
-            color: #232f3e;
-            margin-bottom: 20px;
-        }
-
-        /* Product Grid */
-        .products-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .product-card {
-            background-color: #ffffff;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 15px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .product-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transform: translateY(-2px);
-        }
-
-        .product-image {
-            width: 100%;
-            height: 220px;
-            background-color: #f0f0f0;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 15px;
-            overflow: hidden;
-        }
-
-        .product-image svg {
-            width: 80px;
-            height: 80px;
-            color: #ccc;
-        }
-
-        .product-info {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .product-name {
-            font-size: 16px;
-            font-weight: 500;
-            color: #232f3e;
-            margin-bottom: 8px;
-            line-height: 1.4;
-        }
-
-        .product-price {
-            font-size: 20px;
-            font-weight: 700;
-            color: #B12704;
-            margin-bottom: 10px;
-        }
-
-        .product-rating {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #666;
-        }
-
-        .stars {
-            color: #FFA41C;
-        }
-
-        .add-to-cart {
-            width: 100%;
-            padding: 10px;
-            background-color: #FFD814;
-            border: 1px solid #FCD200;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            margin-top: auto;
-        }
-
-        .add-to-cart:hover {
-            background-color: #F7CA00;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header {
-                flex-wrap: wrap;
-                padding: 15px;
-            }
-
-            .search-container {
-                order: 3;
-                flex-basis: 100%;
-                margin-top: 10px;
-            }
-
-            .products-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                gap: 15px;
-            }
-
-            .product-image {
-                height: 150px;
-            }
-
-            .category-item {
-                padding: 12px 15px;
-                font-size: 13px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="styles/dashboard.css">
 </head>
 <body>
     <!-- Header -->
@@ -275,12 +29,41 @@
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                 </svg>
             </button>
-            <button class="icon-btn" id="profileBtn" title="Profile">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-            </button>
+            
+            <div class="dropdown">
+                <button class="icon-btn" id="menuBtn" title="Menu">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <div class="dropdown-menu" id="dropdownMenu">
+                    <button class="dropdown-item" id="viewProfileBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        View Profile
+                    </button>
+                    <button class="dropdown-item" id="postItemBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Post Item
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item" id="logoutBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        Logout
+                    </button>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -294,8 +77,9 @@
         <a href="#" class="category-item">Sports</a>
         <a href="#" class="category-item">Toys & Games</a>
         <a href="#" class="category-item">Beauty</a>
-        <a href="#" class="category-item">Groceries</a>
         <a href="#" class="category-item">Automotive</a>
+        <a href="#" class="category-item">Baby & Kids</a>
+        <a href="#" class="category-item">Office</a>
     </nav>
 
     <!-- Main Content -->
@@ -303,126 +87,71 @@
         <h2 class="section-title">ITEMS</h2>
         
         <div class="products-grid" id="productsGrid">
-            <!-- Sample product cards - these will be populated by backend -->
-            <div class="product-card">
-                <div class="product-image">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                </div>
-                <div class="product-info">
-                    <div class="product-name">Sample Product Name</div>
-                    <div class="product-price">₱0.00</div>
-                    <div class="product-rating">
-                        <span class="stars">★★★★★</span>
-                        <span>(0)</span>
-                    </div>
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
-            </div>
+            <!-- Products will be loaded dynamically -->
+            <p style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">Loading products...</p>
+        </div>
+    </div>
 
-            <div class="product-card">
-                <div class="product-image">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                </div>
-                <div class="product-info">
-                    <div class="product-name">Sample Product Name</div>
-                    <div class="product-price">₱0.00</div>
-                    <div class="product-rating">
-                        <span class="stars">★★★★★</span>
-                        <span>(0)</span>
-                    </div>
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
+    <!-- Product Detail Modal -->
+    <div class="modal-overlay" id="productModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Product Details</h2>
+                <button class="close-btn" id="closeModal">&times;</button>
             </div>
-
-            <div class="product-card">
-                <div class="product-image">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                </div>
-                <div class="product-info">
-                    <div class="product-name">Sample Product Name</div>
-                    <div class="product-price">₱0.00</div>
-                    <div class="product-rating">
-                        <span class="stars">★★★★★</span>
-                        <span>(0)</span>
+            <div class="modal-body">
+                <div class="product-detail-container">
+                    <div class="product-detail-image" id="modalProductImage">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
                     </div>
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
-            </div>
+                    <div class="product-detail-info">
+                        <h1 class="product-detail-name" id="modalProductName">Sample Product Name</h1>
+                        <div class="product-detail-price" id="modalProductPrice">₱0.00</div>
+                        <div class="product-detail-rating">
+                            <span class="detail-stars" id="modalProductStars">★★★★★</span>
+                            <a href="#" class="rating-count" id="modalProductRating">(0 ratings)</a>
+                        </div>
+                        
+                        <div class="product-description">
+                            <h3 class="description-title">About this item</h3>
+                            <p class="description-text" id="modalProductDescription">
+                                This is a sample product description. It would contain detailed information about the product, its features, specifications, and benefits.
+                            </p>
+                        </div>
 
-            <div class="product-card">
-                <div class="product-image">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                </div>
-                <div class="product-info">
-                    <div class="product-name">Sample Product Name</div>
-                    <div class="product-price">₱0.00</div>
-                    <div class="product-rating">
-                        <span class="stars">★★★★★</span>
-                        <span>(0)</span>
+                        <div class="product-details-list">
+                            <div class="detail-item">
+                                <span class="detail-label">Owner:</span>
+                                <span class="detail-value" id="modalProductOwner">Sample Owner</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Category:</span>
+                                <span class="detail-value" id="modalProductCategory">Electronics</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Condition:</span>
+                                <span class="detail-value" id="modalProductCondition">Like New</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Availability:</span>
+                                <span class="detail-value" id="modalProductAvailability">In Stock</span>
+                            </div>
+                        </div>
+
+                        <div class="modal-actions">
+                            <button class="btn-add-cart" id="modalAddToCart">Add to Cart</button>
+                            <button class="btn-buy-now" id="modalBuyNow">Rent Now</button>
+                        </div>
                     </div>
-                    <button class="add-to-cart">Add to Cart</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Check if user is logged in
-        const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
-        
-        if (!currentUser) {
-            // Redirect to login if not logged in
-            window.location.href = 'index.html';
-        }
-
-        // Cart button handler
-        document.getElementById('cartBtn').addEventListener('click', function() {
-            alert('Cart functionality will be implemented here');
-        });
-
-        // Profile button handler - show menu with logout option
-        document.getElementById('profileBtn').addEventListener('click', function() {
-            const action = confirm(`Hello ${currentUser.username}!\n\nClick OK to logout, or Cancel to view profile.`);
-            if (action) {
-                // Logout
-                sessionStorage.removeItem('currentUser');
-                alert('You have been logged out.');
-                window.location.href = 'index.html';
-            } else {
-                alert('Profile page will be implemented here');
-            }
-        });
-
-        // Add to cart button handlers
-        document.querySelectorAll('.add-to-cart').forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.stopPropagation();
-                alert('Item added to cart!');
-            });
-        });
-
-        // Product card click handlers
-        document.querySelectorAll('.product-card').forEach(card => {
-            card.addEventListener('click', function() {
-                alert('Product details will be shown here');
-            });
-        });
-    </script>
+    <script src="scripts/dashboard.js"></script>
 </body>
 </html>
