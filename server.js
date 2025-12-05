@@ -319,6 +319,62 @@ app.get('/api/items/available', async (req, res) => {
     }
 });
 
+app.post('/api/items', async (req, res) => {
+    console.log('📦 Posting new item');
+    try {
+        const { itemName, ownerId, renterId, description, price, condition, tags, isRenting, isRented, imageUrl } = req.body;
+
+        // Validation
+        if (!itemName || !ownerId || !description || !price || !condition || !tags || tags.length === 0) {
+            console.log('❌ Post item failed: Missing fields');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Item name, description, price, condition, and at least one tag are required' 
+            });
+        }
+
+        // Validate owner exists
+        const owner = await Database.getUserById(ownerId);
+        if (!owner) {
+            console.log('❌ Post item failed: Owner not found');
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Owner not found' 
+            });
+        }
+
+        // Create new item using Item class
+        const Item = require('./classes/Item');
+        const newItem = new Item(null, itemName, ownerId, renterId || null, imageUrl || null);
+        newItem.setDescription(description);
+        newItem.setPrice(price);
+        newItem.setCondition(condition);
+        tags.forEach(tag => newItem.addTag(tag));
+        newItem.isRenting = isRenting !== false; // Default true for posting
+        newItem.isRented = isRented || false;
+
+        // Add item to database
+        await Database.addItem(newItem);
+
+        console.log('✅ Item posted successfully:', itemName);
+        res.status(201).json({
+            success: true,
+            message: 'Item posted successfully',
+            data: {
+                itemId: newItem.getItemId(),
+                itemName: newItem.getItemName()
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Post item error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+});
+
 // Get items by category/tag
 app.get('/api/items/category/:category', async (req, res) => {
     console.log('🏷️ Fetching items by category:', req.params.category);
@@ -413,6 +469,114 @@ app.get('/api/items/renter/:renterId', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Get renter items error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+});
+
+// ==================== RECEIPT API ROUTES ====================
+
+// Get receipts by owner
+app.get('/api/receipts/owner/:ownerId', async (req, res) => {
+    console.log('📄 Fetching receipts for owner:', req.params.ownerId);
+    try {
+        const ownerId = req.params.ownerId;
+        const receipts = await Database.getReceiptsByOwner(ownerId);
+
+        console.log(`✅ Found ${receipts.length} receipts for owner:`, ownerId);
+        res.json({
+            success: true,
+            data: receipts.map(receipt => ({
+                receiptId: receipt.receiptId,
+                itemId: receipt.itemId,
+                ownerId: receipt.ownerId,
+                renterId: receipt.renterId,
+                rentalStartDate: receipt.rentalStartDate,
+                rentalEndDate: receipt.rentalEndDate,
+                rentalPrice: receipt.rentalPrice,
+                status: receipt.status,
+                createdAt: receipt.createdAt
+            }))
+        });
+
+    } catch (error) {
+        console.error('❌ Get owner receipts error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+});
+
+// Get receipts by renter
+app.get('/api/receipts/renter/:renterId', async (req, res) => {
+    console.log('📄 Fetching receipts for renter:', req.params.renterId);
+    try {
+        const renterId = req.params.renterId;
+        const receipts = await Database.getReceiptsByRenter(renterId);
+
+        console.log(`✅ Found ${receipts.length} receipts for renter:`, renterId);
+        res.json({
+            success: true,
+            data: receipts.map(receipt => ({
+                receiptId: receipt.receiptId,
+                itemId: receipt.itemId,
+                ownerId: receipt.ownerId,
+                renterId: receipt.renterId,
+                rentalStartDate: receipt.rentalStartDate,
+                rentalEndDate: receipt.rentalEndDate,
+                rentalPrice: receipt.rentalPrice,
+                status: receipt.status,
+                createdAt: receipt.createdAt
+            }))
+        });
+
+    } catch (error) {
+        console.error('❌ Get renter receipts error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error' 
+        });
+    }
+});
+
+// Get item by ID (for receipt details)
+app.get('/api/items/:itemId', async (req, res) => {
+    console.log('📦 Fetching item:', req.params.itemId);
+    try {
+        const itemId = req.params.itemId;
+        const item = await Database.getItemById(itemId);
+
+        if (!item) {
+            console.log('❌ Item not found:', itemId);
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Item not found' 
+            });
+        }
+
+        console.log('✅ Item found:', item.getItemName());
+        res.json({
+            success: true,
+            data: {
+                itemId: item.getItemId(),
+                itemName: item.getItemName(),
+                ownerId: item.getOwnerId(),
+                renterId: item.getRenterId(),
+                imageUrl: item.getImageUrl(),
+                description: item.getDescription(),
+                price: item.getPrice(),
+                condition: item.getCondition(),
+                tags: item.getTags(),
+                isRenting: item.isRenting,
+                isRented: item.isRented
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Get item error:', error);
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 

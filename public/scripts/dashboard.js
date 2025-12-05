@@ -48,7 +48,13 @@ document.getElementById('viewProfileBtn').addEventListener('click', function() {
 // Post Item button
 document.getElementById('postItemBtn').addEventListener('click', function() {
     dropdownMenu.classList.remove('show');
-    alert('Post Item page will be implemented here');
+    window.location.href = 'post-item.html';
+});
+
+// See Receipts button (NEW)
+document.getElementById('seeReceiptsBtn').addEventListener('click', function() {
+    dropdownMenu.classList.remove('show');
+    window.location.href = 'receipts.html';
 });
 
 // Logout button
