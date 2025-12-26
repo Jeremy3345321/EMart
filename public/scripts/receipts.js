@@ -52,7 +52,7 @@ document.addEventListener('click', function(e) {
 // Dropdown menu actions
 document.getElementById('viewProfileBtn').addEventListener('click', function() {
     dropdownMenu.classList.remove('show');
-    alert('Profile page will be implemented here');
+    window.location.href = 'profile.html';
 });
 
 document.getElementById('postItemBtn').addEventListener('click', function() {

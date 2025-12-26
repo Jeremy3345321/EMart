@@ -42,7 +42,7 @@ document.addEventListener('click', function(e) {
 // View Profile button
 document.getElementById('viewProfileBtn').addEventListener('click', function() {
     dropdownMenu.classList.remove('show');
-    alert('Profile page will be implemented here');
+    window.location.href = 'profile.html';
 });
 
 // Post Item button
