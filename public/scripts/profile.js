@@ -64,7 +64,7 @@ document.getElementById('logoutBtn').addEventListener('click', function() {
 });
 
 document.getElementById('cartBtn').addEventListener('click', function() {
-    alert('Cart functionality will be implemented here');
+    window.location.href = 'cart.html';
 });
 
 // Initialize profile page

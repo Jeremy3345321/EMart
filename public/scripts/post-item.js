@@ -36,7 +36,7 @@ document.getElementById('postItemBtn').addEventListener('click', function() {
     window.location.href = 'post-item.html';
 });
 
-// See Receipts button (NEW)
+// See Receipts button
 const seeReceiptsBtn = document.getElementById('seeReceiptsBtn');
 if (seeReceiptsBtn) {
     seeReceiptsBtn.addEventListener('click', function() {
@@ -56,7 +56,7 @@ document.getElementById('logoutBtn').addEventListener('click', function() {
 
 // Cart button handler
 document.getElementById('cartBtn').addEventListener('click', function() {
-    alert('Cart functionality will be implemented here');
+    window.location.href = 'cart.html';
 });
 
 // Form handling

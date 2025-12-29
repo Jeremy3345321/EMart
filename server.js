@@ -584,6 +584,326 @@ app.get('/api/items/:itemId', async (req, res) => {
     }
 });
 
+// ==================== CART API ROUTES ====================
+
+/**
+ * GET /api/cart/:userId
+ * Get user's cart with full item details
+ */
+app.get('/api/cart/:userId', async (req, res) => {
+    console.log('🛒 [GET CART] User:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            console.log('❌ [GET CART] Invalid user ID');
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const cartItems = await Database.getCart(userId);
+        
+        console.log(`✅ [GET CART] Success: ${cartItems.length} items`);
+        res.json({
+            success: true,
+            data: cartItems
+        });
+        
+    } catch (error) {
+        console.error('❌ [GET CART] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * POST /api/cart
+ * Add item to cart
+ * Body: { userId, itemId, quantity }
+ */
+app.post('/api/cart', async (req, res) => {
+    console.log('🛒 [ADD TO CART] Request:', req.body);
+    try {
+        const { userId, itemId, quantity = 1 } = req.body;
+        
+        // Validation
+        if (!userId || !itemId) {
+            console.log('❌ [ADD TO CART] Missing required fields');
+            return res.status(400).json({
+                success: false,
+                message: 'User ID and Item ID are required'
+            });
+        }
+        
+        if (quantity < 1) {
+            console.log('❌ [ADD TO CART] Invalid quantity');
+            return res.status(400).json({
+                success: false,
+                message: 'Quantity must be at least 1'
+            });
+        }
+        
+        // Add to cart
+        const cartEntry = await Database.addToCart(
+            parseInt(userId), 
+            parseInt(itemId), 
+            parseInt(quantity)
+        );
+        
+        console.log(`✅ [ADD TO CART] Success:`, cartEntry);
+        res.status(201).json({
+            success: true,
+            message: 'Item added to cart',
+            data: cartEntry
+        });
+        
+    } catch (error) {
+        console.error('❌ [ADD TO CART] Error:', error.message);
+        
+        // Handle specific errors
+        if (error.message === 'Item not found') {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+        
+        if (error.message === 'Item is not available for rent') {
+            return res.status(400).json({
+                success: false,
+                message: 'Item is not available for rent'
+            });
+        }
+        
+        if (error.message === 'Cannot add your own item to cart') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot add your own item to cart'
+            });
+        }
+        
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * PUT /api/cart
+ * Update cart item quantity
+ * Body: { userId, itemId, quantity }
+ */
+app.put('/api/cart', async (req, res) => {
+    console.log('🛒 [UPDATE CART] Request:', req.body);
+    try {
+        const { userId, itemId, quantity } = req.body;
+        
+        // Validation
+        if (!userId || !itemId || !quantity) {
+            console.log('❌ [UPDATE CART] Missing required fields');
+            return res.status(400).json({
+                success: false,
+                message: 'User ID, Item ID, and quantity are required'
+            });
+        }
+        
+        if (quantity < 1) {
+            console.log('❌ [UPDATE CART] Invalid quantity');
+            return res.status(400).json({
+                success: false,
+                message: 'Quantity must be at least 1'
+            });
+        }
+        
+        // Update quantity
+        const result = await Database.updateCartQuantity(
+            parseInt(userId), 
+            parseInt(itemId), 
+            parseInt(quantity)
+        );
+        
+        console.log(`✅ [UPDATE CART] Success:`, result);
+        res.json({
+            success: true,
+            message: 'Cart updated',
+            data: result
+        });
+        
+    } catch (error) {
+        console.error('❌ [UPDATE CART] Error:', error.message);
+        
+        if (error.message === 'Cart item not found') {
+            return res.status(404).json({
+                success: false,
+                message: 'Cart item not found'
+            });
+        }
+        
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * DELETE /api/cart/:userId/:itemId
+ * Remove item from cart
+ */
+app.delete('/api/cart/:userId/:itemId', async (req, res) => {
+    console.log('🛒 [REMOVE FROM CART] User:', req.params.userId, 'Item:', req.params.itemId);
+    try {
+        const userId = parseInt(req.params.userId);
+        const itemId = parseInt(req.params.itemId);
+        
+        if (isNaN(userId) || isNaN(itemId)) {
+            console.log('❌ [REMOVE FROM CART] Invalid parameters');
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID or item ID'
+            });
+        }
+        
+        const success = await Database.removeFromCart(userId, itemId);
+        
+        if (!success) {
+            console.log('⚠️ [REMOVE FROM CART] Item not found in cart');
+            return res.status(404).json({
+                success: false,
+                message: 'Cart item not found'
+            });
+        }
+        
+        console.log(`✅ [REMOVE FROM CART] Success`);
+        res.json({
+            success: true,
+            message: 'Item removed from cart'
+        });
+        
+    } catch (error) {
+        console.error('❌ [REMOVE FROM CART] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * DELETE /api/cart/:userId
+ * Clear user's entire cart
+ */
+app.delete('/api/cart/:userId', async (req, res) => {
+    console.log('🛒 [CLEAR CART] User:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            console.log('❌ [CLEAR CART] Invalid user ID');
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const removedCount = await Database.clearCart(userId);
+        
+        console.log(`✅ [CLEAR CART] Success: ${removedCount} items removed`);
+        res.json({
+            success: true,
+            message: 'Cart cleared',
+            data: { removedCount }
+        });
+        
+    } catch (error) {
+        console.error('❌ [CLEAR CART] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/cart/:userId/count
+ * Get cart item count
+ */
+app.get('/api/cart/:userId/count', async (req, res) => {
+    console.log('🛒 [CART COUNT] User:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            console.log('❌ [CART COUNT] Invalid user ID');
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const count = await Database.getCartCount(userId);
+        
+        console.log(`✅ [CART COUNT] Success: ${count}`);
+        res.json({
+            success: true,
+            data: { count }
+        });
+        
+    } catch (error) {
+        console.error('❌ [CART COUNT] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/cart/:userId/total
+ * Get cart total price
+ */
+app.get('/api/cart/:userId/total', async (req, res) => {
+    console.log('🛒 [CART TOTAL] User:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            console.log('❌ [CART TOTAL] Invalid user ID');
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const total = await Database.getCartTotal(userId);
+        
+        console.log(`✅ [CART TOTAL] Success: ₱${total}`);
+        res.json({
+            success: true,
+            data: { total }
+        });
+        
+    } catch (error) {
+        console.error('❌ [CART TOTAL] Error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 // ==================== ERROR HANDLING ====================
 
 // 404 handler

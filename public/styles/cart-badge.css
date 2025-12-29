@@ -1,0 +1,91 @@
+/* Cart Badge Styles */
+.cart-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #ff4444;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+}
+
+/* Toast Notification Styles */
+.toast-notification {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: #388e3c;
+    color: white;
+    padding: 14px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.toast-notification.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-notification svg {
+    flex-shrink: 0;
+}
+
+/* Disabled button styles for modal */
+.btn-add-cart:disabled,
+.btn-buy-now:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #ccc;
+}
+
+.btn-add-cart:disabled:hover,
+.btn-buy-now:disabled:hover {
+    background: #ccc;
+    transform: none;
+}
+
+/* Animation for cart button when item added */
+@keyframes cartPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+.icon-btn.cart-pulse {
+    animation: cartPulse 0.3s ease-in-out;
+}
+
+/* Responsive toast */
+@media (max-width: 768px) {
+    .toast-notification {
+        top: 70px;
+        right: 10px;
+        left: 10px;
+        transform: translateY(-100px);
+    }
+    
+    .toast-notification.show {
+        transform: translateY(0);
+    }
+}

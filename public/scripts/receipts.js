@@ -71,6 +71,10 @@ document.getElementById('logoutBtn').addEventListener('click', function() {
     window.location.href = 'login.html';
 });
 
+document.getElementById('cartBtn').addEventListener('click', function() {
+    window.location.href = 'cart.html'
+});
+
 // Tab switching
 tabButtons.forEach(button => {
     button.addEventListener('click', function() {

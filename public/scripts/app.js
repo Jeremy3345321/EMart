@@ -41,9 +41,6 @@ if (isLoginPage) {
                 // Store logged in user in sessionStorage
                 sessionStorage.setItem('currentUser', JSON.stringify(result.data));
                 
-                // Show success message
-                alert('Login successful!');
-                
                 // Redirect to dashboard
                 window.location.href = '/dashboard';
             } else {

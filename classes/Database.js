@@ -521,6 +521,300 @@ class Database {
             console.log('🔌 Database connection pool closed');
         }
     }
+
+
+    // ==================== CART METHODS ====================
+
+    /**
+     * Add item to user's cart
+     * @param {number} userId - User ID
+     * @param {number} itemId - Item ID
+     * @param {number} quantity - Quantity (default: 1)
+     * @returns {object} Cart entry
+     */
+    static async addToCart(userId, itemId, quantity = 1) {
+        try {
+            await this.initialize();
+            
+            // Check if item exists and is available
+            const [itemRows] = await this.pool.execute(
+                'SELECT * FROM items WHERE item_id = ?',
+                [itemId]
+            );
+            
+            if (itemRows.length === 0) {
+                throw new Error('Item not found');
+            }
+            
+            const item = itemRows[0];
+            if (!item.is_renting || item.is_rented) {
+                throw new Error('Item is not available for rent');
+            }
+            
+            // Check if user is trying to add their own item
+            if (item.owner_id === userId) {
+                throw new Error('Cannot add your own item to cart');
+            }
+            
+            // Check if item already in cart
+            const [existingCart] = await this.pool.execute(
+                'SELECT * FROM cart WHERE user_id = ? AND item_id = ?',
+                [userId, itemId]
+            );
+            
+            if (existingCart.length > 0) {
+                // Update quantity
+                const newQuantity = existingCart[0].quantity + quantity;
+                await this.pool.execute(
+                    'UPDATE cart SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE cart_id = ?',
+                    [newQuantity, existingCart[0].cart_id]
+                );
+                
+                console.log(`✅ Updated cart quantity for user ${userId}, item ${itemId}: ${newQuantity}`);
+                
+                return {
+                    cartId: existingCart[0].cart_id,
+                    userId,
+                    itemId,
+                    quantity: newQuantity
+                };
+            } else {
+                // Insert new cart entry
+                const [result] = await this.pool.execute(
+                    'INSERT INTO cart (user_id, item_id, quantity) VALUES (?, ?, ?)',
+                    [userId, itemId, quantity]
+                );
+                
+                console.log(`✅ Added to cart: User ${userId}, Item ${itemId}, Qty ${quantity}`);
+                
+                return {
+                    cartId: result.insertId,
+                    userId,
+                    itemId,
+                    quantity
+                };
+            }
+        } catch (error) {
+            console.error('❌ Error adding to cart:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Get user's cart with full item details
+     * @param {number} userId - User ID
+     * @returns {array} Cart items with details
+     */
+    static async getCart(userId) {
+        try {
+            await this.initialize();
+            
+            const [rows] = await this.pool.execute(
+                `SELECT 
+                    c.cart_id,
+                    c.user_id,
+                    c.item_id,
+                    c.quantity,
+                    c.added_at,
+                    c.updated_at,
+                    i.item_name,
+                    i.owner_id,
+                    i.item_price,
+                    i.item_condition,
+                    i.item_description,
+                    i.item_tags,
+                    i.is_renting,
+                    i.is_rented,
+                    u.user_name as owner_name
+                FROM cart c
+                INNER JOIN items i ON c.item_id = i.item_id
+                INNER JOIN users u ON i.owner_id = u.user_id
+                WHERE c.user_id = ?
+                ORDER BY c.added_at DESC`,
+                [userId]
+            );
+            
+            console.log(`🛒 Found ${rows.length} items in cart for user ${userId}`);
+            
+            return rows.map(row => ({
+                cartId: row.cart_id,
+                userId: row.user_id,
+                itemId: row.item_id,
+                quantity: row.quantity,
+                addedAt: row.added_at,
+                updatedAt: row.updated_at,
+                item: {
+                    itemName: row.item_name,
+                    ownerId: row.owner_id,
+                    ownerName: row.owner_name,
+                    price: parseFloat(row.item_price),
+                    condition: row.item_condition,
+                    description: row.item_description,
+                    imageUrl: null, // Set to null since column doesn't exist yet
+                    tags: row.item_tags ? JSON.parse(row.item_tags) : [],
+                    isRenting: row.is_renting,
+                    isRented: row.is_rented
+                }
+            }));
+        } catch (error) {
+            console.error('❌ Error getting cart:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Update cart item quantity
+     * @param {number} userId - User ID
+     * @param {number} itemId - Item ID
+     * @param {number} quantity - New quantity
+     * @returns {object} Updated cart entry
+     */
+    static async updateCartQuantity(userId, itemId, quantity) {
+        try {
+            await this.initialize();
+            
+            if (quantity < 1) {
+                throw new Error('Quantity must be at least 1');
+            }
+            
+            const [result] = await this.pool.execute(
+                'UPDATE cart SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND item_id = ?',
+                [quantity, userId, itemId]
+            );
+            
+            if (result.affectedRows === 0) {
+                throw new Error('Cart item not found');
+            }
+            
+            console.log(`✅ Updated cart quantity: User ${userId}, Item ${itemId}, Qty ${quantity}`);
+            
+            return { userId, itemId, quantity };
+        } catch (error) {
+            console.error('❌ Error updating cart quantity:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Remove item from cart
+     * @param {number} userId - User ID
+     * @param {number} itemId - Item ID
+     * @returns {boolean} Success status
+     */
+    static async removeFromCart(userId, itemId) {
+        try {
+            await this.initialize();
+            
+            const [result] = await this.pool.execute(
+                'DELETE FROM cart WHERE user_id = ? AND item_id = ?',
+                [userId, itemId]
+            );
+            
+            if (result.affectedRows === 0) {
+                console.log(`⚠️ Cart item not found: User ${userId}, Item ${itemId}`);
+                return false;
+            }
+            
+            console.log(`✅ Removed from cart: User ${userId}, Item ${itemId}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error removing from cart:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Clear user's entire cart
+     * @param {number} userId - User ID
+     * @returns {number} Number of items removed
+     */
+    static async clearCart(userId) {
+        try {
+            await this.initialize();
+            
+            const [result] = await this.pool.execute(
+                'DELETE FROM cart WHERE user_id = ?',
+                [userId]
+            );
+            
+            console.log(`✅ Cleared cart for user ${userId}: ${result.affectedRows} items removed`);
+            return result.affectedRows;
+        } catch (error) {
+            console.error('❌ Error clearing cart:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Get cart item count for user
+     * @param {number} userId - User ID
+     * @returns {number} Total item count
+     */
+    static async getCartCount(userId) {
+        try {
+            await this.initialize();
+            
+            const [rows] = await this.pool.execute(
+                'SELECT SUM(quantity) as total FROM cart WHERE user_id = ?',
+                [userId]
+            );
+            
+            const count = rows[0].total || 0;
+            console.log(`🛒 Cart count for user ${userId}: ${count}`);
+            return count;
+        } catch (error) {
+            console.error('❌ Error getting cart count:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Get cart total price
+     * @param {number} userId - User ID
+     * @returns {number} Total price
+     */
+    static async getCartTotal(userId) {
+        try {
+            await this.initialize();
+            
+            const [rows] = await this.pool.execute(
+                `SELECT SUM(c.quantity * i.item_price) as total
+                FROM cart c
+                INNER JOIN items i ON c.item_id = i.item_id
+                WHERE c.user_id = ?`,
+                [userId]
+            );
+            
+            const total = parseFloat(rows[0].total) || 0;
+            console.log(`💰 Cart total for user ${userId}: ₱${total}`);
+            return total;
+        } catch (error) {
+            console.error('❌ Error getting cart total:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Check if item is in user's cart
+     * @param {number} userId - User ID
+     * @param {number} itemId - Item ID
+     * @returns {boolean} True if item is in cart
+     */
+    static async isInCart(userId, itemId) {
+        try {
+            await this.initialize();
+            
+            const [rows] = await this.pool.execute(
+                'SELECT cart_id FROM cart WHERE user_id = ? AND item_id = ?',
+                [userId, itemId]
+            );
+            
+            return rows.length > 0;
+        } catch (error) {
+            console.error('❌ Error checking if item in cart:', error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = Database;
