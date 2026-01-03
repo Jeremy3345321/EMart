@@ -48,6 +48,7 @@ body {
 
 .form-group input[type="text"],
 .form-group input[type="number"],
+.form-group input[type="file"],
 .form-group textarea,
 .form-group select {
     width: 100%;
@@ -56,6 +57,11 @@ body {
     border-radius: 4px;
     font-size: 15px;
     transition: border-color 0.2s;
+}
+
+.form-group input[type="file"] {
+    padding: 8px;
+    cursor: pointer;
 }
 
 .form-group input:focus,
@@ -100,6 +106,64 @@ body {
     margin-top: 5px;
 }
 
+/* Image Preview Styles */
+.image-preview {
+    margin-top: 15px;
+    min-height: 200px;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fafafa;
+    position: relative;
+    overflow: hidden;
+}
+
+.image-preview:empty {
+    display: none;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 400px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+
+.image-preview .remove-image {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 2px solid #ff4444;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.image-preview .remove-image:hover {
+    background-color: #ff4444;
+    transform: scale(1.1);
+}
+
+.image-preview .remove-image:hover svg {
+    stroke: white;
+}
+
+.image-preview .remove-image svg {
+    stroke: #ff4444;
+    transition: stroke 0.2s;
+}
+
 .form-actions {
     display: flex;
     gap: 15px;
@@ -138,6 +202,13 @@ body {
     background-color: #F7CA00;
 }
 
+.btn-submit:disabled {
+    background-color: #e0e0e0;
+    color: #999;
+    cursor: not-allowed;
+    border-color: #ccc;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .container {
@@ -156,5 +227,13 @@ body {
 
     .form-actions {
         flex-direction: column;
+    }
+
+    .image-preview {
+        min-height: 150px;
+    }
+
+    .image-preview img {
+        max-height: 300px;
     }
 }

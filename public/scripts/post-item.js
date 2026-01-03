@@ -44,6 +44,7 @@ if (seeReceiptsBtn) {
         window.location.href = 'receipts.html';
     });
 }
+
 // Logout button
 document.getElementById('logoutBtn').addEventListener('click', function() {
     dropdownMenu.classList.remove('show');
@@ -58,6 +59,54 @@ document.getElementById('logoutBtn').addEventListener('click', function() {
 document.getElementById('cartBtn').addEventListener('click', function() {
     window.location.href = 'cart.html';
 });
+
+// Image handling
+const itemImageInput = document.getElementById('itemImage');
+const imagePreview = document.getElementById('imagePreview');
+
+// Image preview handler
+itemImageInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    
+    if (file) {
+        // Validate file size (5MB max)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Image size must be less than 5MB');
+            itemImageInput.value = '';
+            imagePreview.innerHTML = '';
+            return;
+        }
+
+        // Validate file type
+        if (!file.type.match('image.*')) {
+            alert('Please select an image file (JPG, PNG, GIF)');
+            itemImageInput.value = '';
+            imagePreview.innerHTML = '';
+            return;
+        }
+
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imagePreview.innerHTML = `
+                <img src="${e.target.result}" alt="Preview">
+                <button type="button" class="remove-image" onclick="removeImage()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            `;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Remove image function
+function removeImage() {
+    itemImageInput.value = '';
+    imagePreview.innerHTML = '';
+}
 
 // Form handling
 const postItemForm = document.getElementById('postItemForm');
@@ -112,6 +161,24 @@ postItemForm.addEventListener('submit', async function(e) {
         return;
     }
 
+    // Get image as Base64
+    let imageBase64 = null;
+    if (itemImageInput.files[0]) {
+        try {
+            imageBase64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsDataURL(itemImageInput.files[0]);
+            });
+            console.log('✅ Image converted to Base64');
+        } catch (error) {
+            console.error('Error reading image:', error);
+            alert('Failed to process image. Please try again.');
+            return;
+        }
+    }
+
     // Prepare item data
     const itemData = {
         itemName,
@@ -123,10 +190,10 @@ postItemForm.addEventListener('submit', async function(e) {
         tags,
         isRenting: true,
         isRented: false,
-        imageUrl: null
+        imageUrl: imageBase64
     };
 
-    console.log('Sending item data:', itemData);
+    console.log('Sending item data:', { ...itemData, imageUrl: imageBase64 ? '(Base64 data)' : null });
 
     try {
         const response = await fetch('http://localhost:3000/api/items', {

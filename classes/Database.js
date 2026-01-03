@@ -152,8 +152,8 @@ class Database {
             const [result] = await this.pool.execute(
                 `INSERT INTO items (
                     item_name, owner_id, renter_id, is_renting, is_rented, 
-                    item_description, item_price, item_condition, item_tags
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    item_description, item_price, item_condition, item_tags, item_image_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     item.getItemName(),
                     item.getOwnerId(),
@@ -163,7 +163,8 @@ class Database {
                     item.getDescription(),
                     item.getPrice(),
                     item.getCondition(),
-                    JSON.stringify(item.getTags())
+                    JSON.stringify(item.getTags()),
+                    item.getImageUrl()
                 ]
             );
             item.setItemId(result.insertId);

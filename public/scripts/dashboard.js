@@ -68,6 +68,7 @@ document.getElementById('cartBtn').addEventListener('click', function() {
 // Product Modal Elements
 const productModal = document.getElementById('productModal');
 const closeModalBtn = document.getElementById('closeModal');
+const modalProductImage = document.getElementById('modalProductImage');
 const modalProductName = document.getElementById('modalProductName');
 const modalProductPrice = document.getElementById('modalProductPrice');
 const modalProductStars = document.getElementById('modalProductStars');
@@ -114,13 +115,24 @@ async function loadProducts(categoryName = 'All') {
                 productCard.className = 'product-card';
                 productCard.setAttribute('data-item-id', item.itemId);
                 
+                // Check if item has image
+                const hasImage = item.imageUrl && item.imageUrl.trim() !== '';
+                
                 productCard.innerHTML = `
                     <div class="product-image">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                            <polyline points="21 15 16 10 5 21"></polyline>
-                        </svg>
+                        ${hasImage 
+                            ? `<img src="${item.imageUrl}" alt="${item.itemName}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                               <svg style="display:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                   <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                   <polyline points="21 15 16 10 5 21"></polyline>
+                               </svg>`
+                            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                   <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                   <polyline points="21 15 16 10 5 21"></polyline>
+                               </svg>`
+                        }
                     </div>
                     <div class="product-info">
                         <div class="product-name">${item.itemName}</div>
@@ -181,6 +193,29 @@ async function openProductModal(product) {
     modalProductDescription.textContent = product.description || 'No description available.';
     modalProductCondition.textContent = product.condition;
     modalProductCategory.textContent = product.tags.join(', ') || 'Uncategorized';
+    
+    // Display product image in modal
+    const hasImage = product.imageUrl && product.imageUrl.trim() !== '';
+    if (hasImage) {
+        modalProductImage.innerHTML = `
+            <img src="${product.imageUrl}" alt="${product.itemName}" 
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                 style="max-width: 100%; max-height: 100%; object-fit: contain;">
+            <svg style="display:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+        `;
+    } else {
+        modalProductImage.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+        `;
+    }
     
     // Fetch owner information
     try {
