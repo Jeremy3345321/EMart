@@ -72,7 +72,7 @@ document.getElementById('logoutBtn').addEventListener('click', function() {
 });
 
 document.getElementById('cartBtn').addEventListener('click', function() {
-    window.location.href = 'cart.html'
+    window.location.href = 'cart.html';
 });
 
 // Tab switching
