@@ -1,10 +1,6 @@
+// Receipt.js - Receipt class for managing rental receipts
+
 class Receipt {
-    static Status = {
-        ACTIVE: 'active',
-        COMPLETED: 'completed',
-        CANCELLED: 'cancelled',
-    }
-    
     constructor() {
         this.receiptId = null;
         this.itemId = null;
@@ -12,81 +8,179 @@ class Receipt {
         this.renterId = null;
         this.rentalStartDate = null;
         this.rentalEndDate = null;
-        this.rentalPrice = null;
-        this.status = null // enum of Receipt.Status
-        this.isOwner = null // owner, renting
-        this.createdAt = new Date();
+        this.rentalPrice = 0;
+        this.status = 'active'; // active, completed, cancelled
+        this.createdAt = null;
+        this.updatedAt = null;
+    }
+
+    // Getters
+    getReceiptId() {
+        return this.receiptId;
+    }
+
+    getItemId() {
+        return this.itemId;
+    }
+
+    getOwnerId() {
+        return this.ownerId;
+    }
+
+    getRenterId() {
+        return this.renterId;
+    }
+
+    getRentalStartDate() {
+        return this.rentalStartDate;
+    }
+
+    getRentalEndDate() {
+        return this.rentalEndDate;
+    }
+
+    getRentalPrice() {
+        return this.rentalPrice;
+    }
+
+    getStatus() {
+        return this.status;
+    }
+
+    getCreatedAt() {
+        return this.createdAt;
+    }
+
+    getUpdatedAt() {
+        return this.updatedAt;
+    }
+
+    // Setters
+    setReceiptId(receiptId) {
+        this.receiptId = receiptId;
+    }
+
+    setItemId(itemId) {
+        this.itemId = itemId;
+    }
+
+    setOwnerId(ownerId) {
+        this.ownerId = ownerId;
+    }
+
+    setRenterId(renterId) {
+        this.renterId = renterId;
+    }
+
+    setRentalStartDate(date) {
+        this.rentalStartDate = date instanceof Date ? date : new Date(date);
+    }
+
+    setRentalEndDate(date) {
+        this.rentalEndDate = date instanceof Date ? date : new Date(date);
+    }
+
+    setRentalPrice(price) {
+        this.rentalPrice = parseFloat(price);
+    }
+
+    setStatus(status) {
+        const validStatuses = ['active', 'completed', 'cancelled'];
+        if (validStatuses.includes(status)) {
+            this.status = status;
+        } else {
+            throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+        }
+    }
+
+    // Utility methods
+    getRentalDuration() {
+        if (!this.rentalStartDate || !this.rentalEndDate) {
+            return 0;
+        }
+        const start = new Date(this.rentalStartDate);
+        const end = new Date(this.rentalEndDate);
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    }
+
+    isActive() {
+        return this.status === 'active';
+    }
+
+    isCompleted() {
+        return this.status === 'completed';
+    }
+
+    isCancelled() {
+        return this.status === 'cancelled';
+    }
+
+    isOverdue() {
+        if (this.status !== 'active') {
+            return false;
+        }
+        const now = new Date();
+        const endDate = new Date(this.rentalEndDate);
+        return now > endDate;
+    }
+
+    getDaysOverdue() {
+        if (!this.isOverdue()) {
+            return 0;
+        }
+        const now = new Date();
+        const endDate = new Date(this.rentalEndDate);
+        const diffTime = Math.abs(now - endDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    }
+
+    getDaysRemaining() {
+        if (this.status !== 'active') {
+            return 0;
+        }
+        const now = new Date();
+        const endDate = new Date(this.rentalEndDate);
+        if (now > endDate) {
+            return 0;
+        }
+        const diffTime = Math.abs(endDate - now);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    }
+
+    // Calculate late fee (if applicable)
+    calculateLateFee(feePerDay = 10) {
+        if (!this.isOverdue()) {
+            return 0;
+        }
+        return this.getDaysOverdue() * feePerDay;
+    }
+
+    // Format receipt info
+    toString() {
+        return `Receipt #${this.receiptId}: Item ${this.itemId} | Owner: ${this.ownerId} | Renter: ${this.renterId} | Price: ₱${this.rentalPrice} | Status: ${this.status}`;
+    }
+
+    toJSON() {
+        return {
+            receiptId: this.receiptId,
+            itemId: this.itemId,
+            ownerId: this.ownerId,
+            renterId: this.renterId,
+            rentalStartDate: this.rentalStartDate,
+            rentalEndDate: this.rentalEndDate,
+            rentalPrice: this.rentalPrice,
+            status: this.status,
+            createdAt: this.createdAt,
+            updatedAt: this.updatedAt,
+            rentalDuration: this.getRentalDuration(),
+            isOverdue: this.isOverdue(),
+            daysRemaining: this.getDaysRemaining()
+        };
     }
 }
 
-/*
-// ===== RECEIPT USAGE EXAMPLES =====
-
-// Get all receipts for an item (rental history)
-const itemReceipts = await Database.getReceiptsByItem(camera.getItemId());
-console.log(`This item has been rented ${itemReceipts.length} times`);
-
-// Get all receipts where user is the owner (earning history)
-const ownerReceipts = await Database.getReceiptsByOwner(owner.getUserId());
-console.log(`Owner has ${ownerReceipts.length} rental transactions`);
-
-// Get all receipts where user is the renter (rental history)
-const renterReceipts = await Database.getReceiptsByRenter(renter.getUserId());
-console.log(`Renter has rented ${renterReceipts.length} items`);
-
-// Get all active rentals
-const activeRentals = await Database.getActiveReceipts();
-console.log(`${activeRentals.length} items are currently being rented`);
-
-// Get completed rentals
-const completedRentals = await Database.getReceiptsByStatus(Receipt.Status.COMPLETED);
-console.log(`${completedRentals.length} rentals have been completed`);
-
-// Check for overdue rentals
-const overdueRentals = await Database.getOverdueReceipts();
-if (overdueRentals.length > 0) {
-    console.log(`Warning: ${overdueRentals.length} rentals are overdue!`);
-}
-
-// Get total earnings for an owner
-const totalEarnings = await Database.getTotalEarningsByOwner(owner.getUserId());
-console.log(`Owner has earned ${totalEarnings} in total`);
-
-// Get total spending for a renter
-const totalSpending = await Database.getTotalSpendingByRenter(renter.getUserId());
-console.log(`Renter has spent ${totalSpending} in total`);
-
-// Cancel a receipt
-const receiptToCancel = await Database.getReceiptById(1);
-if (receiptToCancel) {
-    await Database.updateReceiptStatus(receiptToCancel.receiptId, Receipt.Status.CANCELLED);
-    console.log('Receipt cancelled');
-} = Receipt.Status.ACTIVE;
-
-// await Database.addReceipt(receipt);
-
-// Renter rents the item
-camera.setRenterId(renter.getUserId());
-camera.rentItem(receipt); // Sets isRented to true and updates database
-
-console.log(`Item rented by user ${renter.getUserId()}`);
-console.log(`Rental period: ${receipt.rentalStartDate} to ${receipt.rentalEndDate}`);
-console.log(`Rental price: ${receipt.rentalPrice}`);
-
-// Get all items owned by a user
-const myItems = await Database.getItemsByOwner(owner.getUserId());
-console.log(`Owner has ${myItems.length} items`);
-
-// Get all items rented by a user
-const rentedItems = await Database.getItemsByRenter(renter.getUserId());
-console.log(`Renter has ${rentedItems.length} items currently rented`);
-
-// Later: Return the item
-receipt.status = Receipt.Status.COMPLETED;
-camera.isRented = false;
-camera.setRenterId(null);
-await Database.updateItem(camera);
-// await Database.updateReceipt(receipt);
-
-console.log(`Item returned and receipt completed`);
-*/
+module.exports = Receipt;

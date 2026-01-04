@@ -1,13 +1,14 @@
 // dashboard.js
 
-// Check if user is logged in
 const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
 
 if (!currentUser) {
+    console.log('❌ No user found, redirecting to login');
     window.location.href = 'login.html';
+} else {
+    console.log('✅ User logged in:', currentUser.username, 'ID:', currentUser.userId);
 }
 
-// Map HTML category names to backend tag names
 const categoryMap = {
     'All': 'All',
     'Electronics': 'Electronics',
@@ -81,12 +82,15 @@ const modalProductAvailability = document.getElementById('modalProductAvailabili
 const modalAddToCart = document.getElementById('modalAddToCart');
 const modalBuyNow = document.getElementById('modalBuyNow');
 
-// Global variables
 let currentCategory = 'All';
-let currentProduct = null; // Store current product being viewed
+let currentProduct = null;
 
-// Load products with optional category filter
+// Load products with category filter
 async function loadProducts(categoryName = 'All') {
+    console.log('='.repeat(50));
+    console.log('🔄 LOADING PRODUCTS');
+    console.log('Category:', categoryName);
+    
     try {
         currentCategory = categoryName;
         const backendTag = categoryMap[categoryName] || categoryName;
@@ -96,26 +100,57 @@ async function loadProducts(categoryName = 'All') {
             url += `?tag=${encodeURIComponent(backendTag)}`;
         }
         
-        console.log(`Loading products for category: ${categoryName} (backend: ${backendTag})`);
+        console.log('📡 Fetching from:', url);
         
         const response = await fetch(url);
+        console.log('📥 Response status:', response.status);
+        
         const data = await response.json();
+        console.log('📦 Response data:', data);
 
         if (data.success) {
             const productsGrid = document.getElementById('productsGrid');
             productsGrid.innerHTML = '';
 
-            if (data.data.length === 0) {
-                productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">No items found in this category.</p>';
+            console.log(`📊 Total items received: ${data.data.length}`);
+            
+            // Log each item's status
+            console.log('📋 Item details:');
+            data.data.forEach((item, index) => {
+                console.log(`  ${index + 1}. "${item.itemName}":`);
+                console.log(`     - isRenting: ${item.isRenting} (type: ${typeof item.isRenting})`);
+                console.log(`     - isRented: ${item.isRented} (type: ${typeof item.isRented})`);
+                console.log(`     - Owner ID: ${item.ownerId}`);
+                console.log(`     - Item ID: ${item.itemId}`);
+            });
+            
+            // Filter with detailed logging
+            const availableItems = data.data.filter(item => {
+                const rentingCheck = item.isRenting === true || item.isRenting === 1;
+                const rentedCheck = item.isRented === false || item.isRented === 0;
+                const isAvailable = rentingCheck && rentedCheck;
+                
+                if (!isAvailable) {
+                    console.log(`❌ Filtering OUT "${item.itemName}": isRenting=${item.isRenting}, isRented=${item.isRented}`);
+                }
+                
+                return isAvailable;
+            });
+
+            console.log(`✅ Items after filter: ${availableItems.length}`);
+
+            if (availableItems.length === 0) {
+                console.log('⚠️ No items to display after filtering');
+                productsGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">No items available in this category.</p>';
                 return;
             }
 
-            data.data.forEach(item => {
+            console.log('🎨 Rendering product cards...');
+            availableItems.forEach(item => {
                 const productCard = document.createElement('div');
                 productCard.className = 'product-card';
                 productCard.setAttribute('data-item-id', item.itemId);
                 
-                // Check if item has image
                 const hasImage = item.imageUrl && item.imageUrl.trim() !== '';
                 
                 productCard.innerHTML = `
@@ -159,13 +194,16 @@ async function loadProducts(categoryName = 'All') {
                 });
                 
                 productsGrid.appendChild(productCard);
+                console.log(`  ✅ Rendered: "${item.itemName}"`);
             });
             
-            console.log(`✅ Loaded ${data.data.length} products`);
+            console.log(`✅ Successfully displayed ${availableItems.length} products`);
+            console.log('='.repeat(50));
         }
     } catch (error) {
-        console.error('Error loading products:', error);
-        alert('Failed to load products. Please check the console for details.');
+        console.error('❌ ERROR loading products:', error);
+        console.error('Error stack:', error.stack);
+        alert('Failed to load products. Check console for details.');
     }
 }
 
@@ -176,17 +214,19 @@ document.querySelectorAll('.category-item').forEach(item => {
         document.querySelectorAll('.category-item').forEach(i => i.classList.remove('active'));
         this.classList.add('active');
         const category = this.textContent.trim();
+        console.log('📂 Category clicked:', category);
         loadProducts(category);
     });
 });
 
-// Set "All" as active by default
 document.querySelector('.category-item').classList.add('active');
+console.log('🚀 Initializing dashboard - loading all products');
 loadProducts('All');
 
 // Open product modal
 async function openProductModal(product) {
-    currentProduct = product; // Store current product
+    console.log('🔍 Opening modal for:', product.itemName);
+    currentProduct = product;
     
     modalProductName.textContent = product.itemName;
     modalProductPrice.textContent = `₱${parseFloat(product.price).toFixed(2)}`;
@@ -194,7 +234,6 @@ async function openProductModal(product) {
     modalProductCondition.textContent = product.condition;
     modalProductCategory.textContent = product.tags.join(', ') || 'Uncategorized';
     
-    // Display product image in modal
     const hasImage = product.imageUrl && product.imageUrl.trim() !== '';
     if (hasImage) {
         modalProductImage.innerHTML = `
@@ -223,7 +262,7 @@ async function openProductModal(product) {
         const userData = await response.json();
         if (userData.success) {
             modalProductOwner.textContent = userData.data.username;
-            product.ownerUsername = userData.data.username; // Store for cart
+            product.ownerUsername = userData.data.username;
         } else {
             modalProductOwner.textContent = 'Unknown';
             product.ownerUsername = 'Unknown';
@@ -279,42 +318,33 @@ document.addEventListener('keydown', function(e) {
 
 // Add item to cart function
 async function addItemToCart(product) {
-    // Check if item is available
+    console.log('🛒 Adding to cart:', product.itemName);
+    
     if (product.isRented || !product.isRenting) {
         alert('This item is not available for rent at the moment.');
         return;
     }
     
-    // Check if user is trying to add their own item
     if (product.ownerId === currentUser.userId) {
         alert('You cannot add your own item to the cart.');
         return;
     }
     
     try {
-        // Add to cart using cartManager
         cartManager.addToCart(product);
-        
-        // Show success message
         showToast('Item added to cart successfully!');
-        
         console.log(`✅ Added ${product.itemName} to cart`);
     } catch (error) {
         console.error('Error adding to cart:', error);
-        console.log('Error adding to cart:', error);
         alert('Failed to add item to cart. Please try again.');
     }
 }
 
 // Toast notification function
 function showToast(message, duration = 3000) {
-    // Remove existing toast if any
     const existingToast = document.querySelector('.toast-notification');
-    if (existingToast) {
-        existingToast.remove();
-    }
+    if (existingToast) existingToast.remove();
     
-    // Create toast element
     const toast = document.createElement('div');
     toast.className = 'toast-notification';
     toast.innerHTML = `
@@ -325,11 +355,7 @@ function showToast(message, duration = 3000) {
     `;
     
     document.body.appendChild(toast);
-    
-    // Trigger animation
     setTimeout(() => toast.classList.add('show'), 10);
-    
-    // Remove after duration
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
@@ -352,3 +378,33 @@ modalBuyNow.addEventListener('click', function() {
         }, 500);
     }
 });
+
+// Add CSS for toast notification
+const style = document.createElement('style');
+style.textContent = `
+    .toast-notification {
+        position: fixed;
+        bottom: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #232f3e;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 9999;
+        transition: bottom 0.3s ease;
+        font-size: 15px;
+        font-weight: 500;
+    }
+    .toast-notification.show {
+        bottom: 30px;
+    }
+    .toast-notification svg {
+        color: #4CAF50;
+    }
+`;
+document.head.appendChild(style);

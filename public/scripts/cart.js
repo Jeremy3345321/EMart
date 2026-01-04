@@ -1,226 +1,34 @@
-// cart.js - Updated for Database Backend
+// cart.js
 
+const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
+const API_URL = 'http://localhost:3000/api';
+
+if (!currentUser) {
+    window.location.href = 'login.html';
+}
+
+// Global cart variable
+let cart = [];
+
+// DOM Elements
 const cartItemsContainer = document.getElementById('cartItems');
-const itemCountElement = document.getElementById('itemCount');
-const subtotalElement = document.getElementById('subtotal');
-const shippingElement = document.getElementById('shipping');
-const totalElement = document.getElementById('total');
+const itemCount = document.getElementById('itemCount');
+const subtotal = document.getElementById('subtotal');
+const shipping = document.getElementById('shipping');
+const total = document.getElementById('total');
 const checkoutBtn = document.getElementById('checkoutBtn');
 const clearCartBtn = document.getElementById('clearCartBtn');
 
-// Shipping cost
-const SHIPPING_COST = 50;
-
-// Load and display cart
-async function displayCart() {
-    try {
-        console.log('🛒 Loading cart...');
-        const cart = await cartManager.getCart();
-        
-        console.log('📦 Cart data:', cart);
-        console.log('📊 Cart length:', cart.length);
-        
-        if (!cart || cart.length === 0) {
-            cartItemsContainer.innerHTML = `
-                <div class="empty-cart-message">
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <circle cx="9" cy="21" r="1"></circle>
-                        <circle cx="20" cy="21" r="1"></circle>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    <h2>Your cart is empty</h2>
-                    <p>Add items to get started!</p>
-                    <button onclick="window.location.href='dashboard.html'" class="shop-now-btn">Shop Now</button>
-                </div>
-            `;
-            checkoutBtn.disabled = true;
-            clearCartBtn.disabled = true;
-            await updateSummary();
-            return;
-        }
-        
-        checkoutBtn.disabled = false;
-        clearCartBtn.disabled = false;
-        
-        cartItemsContainer.innerHTML = '';
-        
-        cart.forEach(item => {
-            console.log('📦 Creating cart item:', item);
-            const cartItem = createCartItem(item);
-            cartItemsContainer.appendChild(cartItem);
-        });
-        
-        await updateSummary();
-        console.log('✅ Cart display complete');
-    } catch (error) {
-        console.error('❌ Error displaying cart:', error);
-        cartItemsContainer.innerHTML = `
-            <div class="empty-cart-message">
-                <h2>Error loading cart</h2>
-                <p>Please try refreshing the page.</p>
-                <button onclick="location.reload()" class="shop-now-btn">Refresh</button>
-            </div>
-        `;
-    }
-}
-
-// Create cart item element
-function createCartItem(item) {
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'cart-item';
-    itemDiv.dataset.id = item.id;
-    
-    // Ensure all values exist with fallbacks
-    const itemName = item.name || 'Unknown Item';
-    const itemCategory = item.category || 'Uncategorized';
-    const itemOwner = item.owner || 'Unknown';
-    const itemCondition = item.condition || 'Not specified';
-    const itemPrice = parseFloat(item.price) || 0;
-    const itemQuantity = parseInt(item.quantity) || 1;
-    
-    itemDiv.innerHTML = `
-        <div class="item-image">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-            </svg>
-        </div>
-        <div class="item-details">
-            <h3 class="item-name">${itemName}</h3>
-            <p class="item-category">${itemCategory}</p>
-            <p class="item-owner">Seller: ${itemOwner}</p>
-            <p class="item-condition">Condition: ${itemCondition}</p>
-        </div>
-        <div class="item-quantity">
-            <button class="qty-btn" onclick="changeQuantity(${item.id}, -1)">-</button>
-            <input type="number" value="${itemQuantity}" min="1" onchange="updateItemQuantity(${item.id}, this.value)" class="qty-input">
-            <button class="qty-btn" onclick="changeQuantity(${item.id}, 1)">+</button>
-        </div>
-        <div class="item-price">₱${(itemPrice * itemQuantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-        <button class="remove-btn" onclick="removeItem(${item.id})" title="Remove item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-            </svg>
-        </button>
-    `;
-    
-    return itemDiv;
-}
-
-// Change quantity
-async function changeQuantity(productId, change) {
-    try {
-        const cart = await cartManager.getCart();
-        const item = cart.find(i => i.id === productId);
-        
-        if (item) {
-            const newQuantity = item.quantity + change;
-            if (newQuantity > 0) {
-                await cartManager.updateQuantity(productId, newQuantity);
-                await displayCart();
-            }
-        }
-    } catch (error) {
-        console.error('❌ Error changing quantity:', error);
-        alert('Failed to update quantity. Please try again.');
-    }
-}
-
-// Update item quantity from input
-async function updateItemQuantity(productId, quantity) {
-    try {
-        const qty = parseInt(quantity);
-        if (qty > 0) {
-            await cartManager.updateQuantity(productId, qty);
-            await displayCart();
-        }
-    } catch (error) {
-        console.error('❌ Error updating quantity:', error);
-        alert('Failed to update quantity. Please try again.');
-    }
-}
-
-// Remove item
-async function removeItem(productId) {
-    if (confirm('Remove this item from cart?')) {
-        try {
-            await cartManager.removeFromCart(productId);
-            await displayCart();
-        } catch (error) {
-            console.error('❌ Error removing item:', error);
-            alert('Failed to remove item. Please try again.');
-        }
-    }
-}
-
-// Update order summary
-async function updateSummary() {
-    try {
-        const cart = await cartManager.getCart();
-        const itemCount = await cartManager.getItemCount();
-        const subtotal = await cartManager.getTotal();
-        const shipping = cart.length > 0 ? SHIPPING_COST : 0;
-        const total = subtotal + shipping;
-        
-        itemCountElement.textContent = itemCount;
-        subtotalElement.textContent = `₱${subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        shippingElement.textContent = `₱${shipping.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-        totalElement.textContent = `₱${total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    } catch (error) {
-        console.error('❌ Error updating summary:', error);
-    }
-}
-
-// Clear cart
-clearCartBtn.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to clear your cart?')) {
-        try {
-            await cartManager.clearCart();
-            await displayCart();
-        } catch (error) {
-            console.error('❌ Error clearing cart:', error);
-            alert('Failed to clear cart. Please try again.');
-        }
-    }
-});
-
-// Checkout
-checkoutBtn.addEventListener('click', async () => {
-    try {
-        const cart = await cartManager.getCart();
-        if (cart.length === 0) {
-            alert('Your cart is empty!');
-            return;
-        }
-        
-        alert('Proceeding to checkout...');
-        // You can add checkout page navigation here
-        // window.location.href = 'checkout.html';
-    } catch (error) {
-        console.error('❌ Error during checkout:', error);
-        alert('Failed to proceed to checkout. Please try again.');
-    }
-});
-
-// Cart button (already on cart page)
-document.getElementById('cartBtn').addEventListener('click', () => {
-    window.location.href = 'cart.html';
-});
-
-// Dropdown menu actions
-const dropdownMenu = document.getElementById('dropdownMenu');
+// Dropdown menu handlers
 const menuBtn = document.getElementById('menuBtn');
+const dropdownMenu = document.getElementById('dropdownMenu');
 
-menuBtn.addEventListener('click', (e) => {
+menuBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     dropdownMenu.classList.toggle('show');
 });
 
-document.addEventListener('click', (e) => {
+document.addEventListener('click', function(e) {
     if (!menuBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
         dropdownMenu.classList.remove('show');
     }
@@ -245,6 +53,283 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
     }
 });
 
-// Initialize cart display
+// Render cart items
+async function renderCart() {
+    console.log('🔄 Rendering cart...');
+    
+    // FIXED: Properly await the async function
+    cart = await cartManager.getCart();
+    console.log('📦 Cart data:', cart);
+    
+    if (!cart || cart.length === 0) {
+        console.log('⚠️ Cart is empty');
+        cartItemsContainer.innerHTML = `
+            <div class="empty-cart-message">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <h2>Your cart is empty</h2>
+                <p>Add items to get started!</p>
+                <button onclick="window.location.href='dashboard.html'" class="shop-now-btn">Shop Now</button>
+            </div>
+        `;
+        checkoutBtn.disabled = true;
+        clearCartBtn.disabled = true;
+        itemCount.textContent = '0';
+        subtotal.textContent = '₱0.00';
+        shipping.textContent = '₱0.00';
+        total.textContent = '₱0.00';
+        return;
+    }
+    
+    console.log(`✅ Rendering ${cart.length} items`);
+    checkoutBtn.disabled = false;
+    clearCartBtn.disabled = false;
+    
+    cartItemsContainer.innerHTML = cart.map(cartItem => {
+        console.log('📋 Cart item:', cartItem);
+        return `
+            <div class="cart-item" data-item-id="${cartItem.id}">
+                <div class="item-image">
+                    ${cartItem.item?.imageUrl && cartItem.item.imageUrl.trim() !== '' 
+                        ? `<img src="${cartItem.item.imageUrl}" alt="${cartItem.name}">` 
+                        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                               <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                               <polyline points="21 15 16 10 5 21"></polyline>
+                           </svg>`
+                    }
+                </div>
+                <div class="item-details">
+                    <h3 class="item-name">${cartItem.name}</h3>
+                    <p class="item-owner">Owner: ${cartItem.owner || 'Unknown'}</p>
+                    <p class="item-condition">Condition: ${cartItem.condition || 'Good'}</p>
+                </div>
+                <div class="item-price">₱${parseFloat(cartItem.price).toFixed(2)}</div>
+                <button class="remove-item-btn" onclick="removeFromCart(${cartItem.id})" title="Remove from cart">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+    }).join('');
+    
+    updateCartTotal();
+}
+
+// Update cart total
+function updateCartTotal() {
+    const totalAmount = cart.reduce((sum, item) => sum + parseFloat(item.price || 0), 0);
+    const shippingFee = cart.length > 0 ? 50 : 0; // ₱50 flat shipping fee
+    const finalTotal = totalAmount + shippingFee;
+    
+    itemCount.textContent = cart.length;
+    subtotal.textContent = `₱${totalAmount.toFixed(2)}`;
+    shipping.textContent = `₱${shippingFee.toFixed(2)}`;
+    total.textContent = `₱${finalTotal.toFixed(2)}`;
+    
+    console.log(`💰 Total: ₱${finalTotal.toFixed(2)} (${cart.length} items + ₱${shippingFee} shipping)`);
+}
+
+// Remove item from cart
+async function removeFromCart(itemId) {
+    console.log('🗑️ Removing item:', itemId);
+    if (confirm('Remove this item from cart?')) {
+        const success = await cartManager.removeFromCart(itemId);
+        if (success) {
+            await renderCart();
+            showToast('Item removed from cart');
+        }
+    }
+}
+
+// Clear entire cart
+clearCartBtn.addEventListener('click', async function() {
+    if (confirm('Are you sure you want to clear your entire cart?')) {
+        const success = await cartManager.clearCart();
+        if (success) {
+            await renderCart();
+            showToast('Cart cleared');
+        }
+    }
+});
+
+// Checkout process
+async function checkout() {
+    console.log('💳 Starting checkout...');
+    
+    if (!cart || cart.length === 0) {
+        alert('Your cart is empty!');
+        return;
+    }
+    
+    // Show loading state
+    checkoutBtn.disabled = true;
+    const originalHTML = checkoutBtn.innerHTML;
+    checkoutBtn.innerHTML = '<span>Processing...</span>';
+    
+    try {
+        const rentalStartDate = new Date();
+        const rentalEndDate = new Date();
+        rentalEndDate.setDate(rentalEndDate.getDate() + 7); // Default 7 days rental
+        
+        const checkoutResults = [];
+        
+        // Process each item in cart
+        for (const cartItem of cart) {
+            try {
+                console.log(`Processing: ${cartItem.name} (ID: ${cartItem.id})`);
+                
+                // 1. Update item status to rented
+                const updateResponse = await fetch(`${API_URL}/items/${cartItem.id}/rent`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        renterId: currentUser.userId,
+                        isRented: true
+                    })
+                });
+                
+                const updateData = await updateResponse.json();
+                
+                if (!updateData.success) {
+                    throw new Error(`Failed to update item: ${updateData.message}`);
+                }
+                
+                // 2. Create receipt
+                const receiptResponse = await fetch(`${API_URL}/receipts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        itemId: cartItem.id,
+                        ownerId: cartItem.ownerId,
+                        renterId: currentUser.userId,
+                        rentalStartDate: rentalStartDate.toISOString(),
+                        rentalEndDate: rentalEndDate.toISOString(),
+                        rentalPrice: cartItem.price,
+                        status: 'active'
+                    })
+                });
+                
+                const receiptData = await receiptResponse.json();
+                
+                if (!receiptData.success) {
+                    throw new Error(`Failed to create receipt: ${receiptData.message}`);
+                }
+                
+                checkoutResults.push({
+                    success: true,
+                    itemName: cartItem.name,
+                    receiptId: receiptData.data.receiptId
+                });
+                
+                console.log(`✅ Successfully rented: ${cartItem.name}`);
+                
+            } catch (itemError) {
+                console.error(`Error processing ${cartItem.name}:`, itemError);
+                checkoutResults.push({
+                    success: false,
+                    itemName: cartItem.name,
+                    error: itemError.message
+                });
+            }
+        }
+        
+        // Check results
+        const successCount = checkoutResults.filter(r => r.success).length;
+        const failCount = checkoutResults.filter(r => !r.success).length;
+        
+        if (successCount > 0) {
+            // Clear cart of successfully rented items
+            for (const result of checkoutResults.filter(r => r.success)) {
+                const cartItem = cart.find(i => i.name === result.itemName);
+                if (cartItem) {
+                    await cartManager.removeFromCart(cartItem.id);
+                }
+            }
+            
+            // Show success message
+            if (failCount === 0) {
+                alert(`Success! All ${successCount} items have been rented. Check your receipts for details.`);
+                window.location.href = 'receipts.html';
+            } else {
+                alert(`Partially successful: ${successCount} items rented, ${failCount} failed. Check console for details.`);
+                await renderCart();
+            }
+        } else {
+            alert('Checkout failed. Please try again or contact support.');
+        }
+        
+    } catch (error) {
+        console.error('❌ Checkout error:', error);
+        alert('An error occurred during checkout. Please try again.');
+    } finally {
+        checkoutBtn.disabled = false;
+        checkoutBtn.innerHTML = originalHTML;
+    }
+}
+
+// Toast notification
+function showToast(message) {
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) existingToast.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Event listeners
+checkoutBtn.addEventListener('click', checkout);
+
+// Initialize - Load cart on page load
 console.log('🚀 Initializing cart page...');
-displayCart();
+renderCart().then(() => {
+    console.log('✅ Cart page initialized');
+});
+
+// Add toast CSS
+const style = document.createElement('style');
+style.textContent = `
+    .toast-notification {
+        position: fixed;
+        bottom: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #232f3e;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 9999;
+        transition: bottom 0.3s ease;
+        font-size: 15px;
+        font-weight: 500;
+    }
+    .toast-notification.show {
+        bottom: 30px;
+    }
+    .toast-notification svg {
+        color: #4CAF50;
+    }
+`;
+document.head.appendChild(style);

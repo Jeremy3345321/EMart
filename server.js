@@ -584,6 +584,291 @@ app.get('/api/items/:itemId', async (req, res) => {
     }
 });
 
+// ==================== RENTAL PROCESS ROUTES ====================
+
+// Update item to rented status
+app.put('/api/items/:itemId/rent', async (req, res) => {
+    console.log('🏠 Renting item:', req.params.itemId);
+    try {
+        const { itemId } = req.params;
+        const { renterId, isRented } = req.body;
+
+        // Validate input
+        if (!renterId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Renter ID is required'
+            });
+        }
+
+        // Get the item
+        const item = await Database.getItemById(itemId);
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Check if item is already rented
+        if (item.isRented) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item is already rented'
+            });
+        }
+
+        // Check if item is available for renting
+        if (!item.isRenting) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item is not available for rent'
+            });
+        }
+
+        // Check if owner is trying to rent their own item
+        if (item.getOwnerId() === renterId) {
+            return res.status(400).json({
+                success: false,
+                message: 'You cannot rent your own item'
+            });
+        }
+
+        // Update item
+        item.setRenterId(renterId);
+        item.isRented = true;
+        await Database.updateItem(item);
+
+        console.log(`✅ Item rented successfully: ${item.getItemName()}`);
+        res.json({
+            success: true,
+            message: 'Item rented successfully',
+            data: {
+                itemId: item.getItemId(),
+                itemName: item.getItemName(),
+                renterId: item.getRenterId(),
+                isRented: item.isRented
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Rent item error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Return item (end rental)
+app.put('/api/items/:itemId/return', async (req, res) => {
+    console.log('🔙 Returning item:', req.params.itemId);
+    try {
+        const { itemId } = req.params;
+        const { receiptId } = req.body;
+
+        // Get the item
+        const item = await Database.getItemById(itemId);
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Check if item is actually rented
+        if (!item.isRented) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item is not currently rented'
+            });
+        }
+
+        // Update item
+        item.setRenterId(null);
+        item.isRented = false;
+        await Database.updateItem(item);
+
+        // Update receipt status if provided
+        if (receiptId) {
+            await Database.updateReceiptStatus(receiptId, 'completed');
+        }
+
+        console.log(`✅ Item returned successfully: ${item.getItemName()}`);
+        res.json({
+            success: true,
+            message: 'Item returned successfully',
+            data: {
+                itemId: item.getItemId(),
+                itemName: item.getItemName(),
+                isRented: item.isRented
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Return item error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// ==================== RECEIPT ROUTES ====================
+
+// Create a new receipt
+app.post('/api/receipts', async (req, res) => {
+    console.log('📄 Creating receipt');
+    try {
+        const {
+            itemId,
+            ownerId,
+            renterId,
+            rentalStartDate,
+            rentalEndDate,
+            rentalPrice,
+            status
+        } = req.body;
+
+        // Validation
+        if (!itemId || !ownerId || !renterId || !rentalStartDate || !rentalEndDate || !rentalPrice) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+
+        // Validate that owner and renter exist
+        const owner = await Database.getUserById(ownerId);
+        const renter = await Database.getUserById(renterId);
+        const item = await Database.getItemById(itemId);
+
+        if (!owner || !renter || !item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Owner, renter, or item not found'
+            });
+        }
+
+        // Create receipt
+        const Receipt = require('./classes/Receipt');
+        const receipt = new Receipt();
+        receipt.itemId = itemId;
+        receipt.ownerId = ownerId;
+        receipt.renterId = renterId;
+        receipt.rentalStartDate = new Date(rentalStartDate);
+        receipt.rentalEndDate = new Date(rentalEndDate);
+        receipt.rentalPrice = parseFloat(rentalPrice);
+        receipt.status = status || 'active';
+
+        // Add to database
+        await Database.addReceipt(receipt);
+
+        console.log(`✅ Receipt created: ${receipt.receiptId}`);
+        res.status(201).json({
+            success: true,
+            message: 'Receipt created successfully',
+            data: {
+                receiptId: receipt.receiptId,
+                itemId: receipt.itemId,
+                status: receipt.status
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Create receipt error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Update receipt status
+app.put('/api/receipts/:receiptId/status', async (req, res) => {
+    console.log('📝 Updating receipt status:', req.params.receiptId);
+    try {
+        const { receiptId } = req.params;
+        const { status } = req.body;
+
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Status is required'
+            });
+        }
+
+        // Valid statuses
+        const validStatuses = ['active', 'completed', 'cancelled'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid status'
+            });
+        }
+
+        await Database.updateReceiptStatus(receiptId, status);
+
+        console.log(`✅ Receipt status updated: ${receiptId} -> ${status}`);
+        res.json({
+            success: true,
+            message: 'Receipt status updated',
+            data: { receiptId, status }
+        });
+
+    } catch (error) {
+        console.error('❌ Update receipt status error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Get receipt by ID
+app.get('/api/receipts/:receiptId', async (req, res) => {
+    console.log('📄 Fetching receipt:', req.params.receiptId);
+    try {
+        const { receiptId } = req.params;
+        const receipt = await Database.getReceiptById(receiptId);
+
+        if (!receipt) {
+            return res.status(404).json({
+                success: false,
+                message: 'Receipt not found'
+            });
+        }
+
+        console.log('✅ Receipt found');
+        res.json({
+            success: true,
+            data: {
+                receiptId: receipt.receiptId,
+                itemId: receipt.itemId,
+                ownerId: receipt.ownerId,
+                renterId: receipt.renterId,
+                rentalStartDate: receipt.rentalStartDate,
+                rentalEndDate: receipt.rentalEndDate,
+                rentalPrice: receipt.rentalPrice,
+                status: receipt.status,
+                createdAt: receipt.createdAt
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Get receipt error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 // ==================== CART API ROUTES ====================
 
 /**
