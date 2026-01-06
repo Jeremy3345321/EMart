@@ -1189,6 +1189,433 @@ app.get('/api/cart/:userId/total', async (req, res) => {
     }
 });
 
+// ==================== NOTIFICATION API ROUTES ====================
+
+// Get user's notifications
+app.get('/api/notifications/:userId', async (req, res) => {
+    console.log('📬 Fetching notifications for user:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        const limit = parseInt(req.query.limit) || 50;
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const notifications = await Database.getNotificationsByUser(userId, limit);
+        
+        console.log(`✅ Found ${notifications.length} notifications`);
+        res.json({
+            success: true,
+            data: notifications.map(n => n.toJSON())
+        });
+        
+    } catch (error) {
+        console.error('❌ Get notifications error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Get unread notification count
+app.get('/api/notifications/:userId/unread-count', async (req, res) => {
+    console.log('📬 Getting unread count for user:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const count = await Database.getUnreadNotificationCount(userId);
+        
+        res.json({
+            success: true,
+            data: { count }
+        });
+        
+    } catch (error) {
+        console.error('❌ Get unread count error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Mark notification as read
+app.put('/api/notifications/:notificationId/read', async (req, res) => {
+    console.log('✅ Marking notification as read:', req.params.notificationId);
+    try {
+        const notificationId = parseInt(req.params.notificationId);
+        
+        if (isNaN(notificationId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid notification ID'
+            });
+        }
+        
+        const success = await Database.markNotificationAsRead(notificationId);
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: 'Notification marked as read'
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to mark notification as read'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Mark as read error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Mark all notifications as read
+app.put('/api/notifications/:userId/read-all', async (req, res) => {
+    console.log('✅ Marking all notifications as read for user:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const count = await Database.markAllNotificationsAsRead(userId);
+        
+        res.json({
+            success: true,
+            message: `Marked ${count} notifications as read`,
+            data: { count }
+        });
+        
+    } catch (error) {
+        console.error('❌ Mark all as read error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Delete notification
+app.delete('/api/notifications/:notificationId', async (req, res) => {
+    console.log('🗑️ Deleting notification:', req.params.notificationId);
+    try {
+        const notificationId = parseInt(req.params.notificationId);
+        
+        if (isNaN(notificationId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid notification ID'
+            });
+        }
+        
+        const success = await Database.deleteNotification(notificationId);
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: 'Notification deleted'
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                message: 'Failed to delete notification'
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Delete notification error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Create notification (for testing or manual creation)
+app.post('/api/notifications', async (req, res) => {
+    console.log('📬 Creating notification');
+    try {
+        const { userId, type, title, message, itemId, relatedUserId } = req.body;
+        
+        if (!userId || !type || !title || !message) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID, type, title, and message are required'
+            });
+        }
+        
+        const Notification = require('./classes/Notification');
+        const notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setMessage(message);
+        if (itemId) notification.setItemId(itemId);
+        if (relatedUserId) notification.setRelatedUserId(relatedUserId);
+        
+        await Database.addNotification(notification);
+        
+        res.status(201).json({
+            success: true,
+            message: 'Notification created',
+            data: notification.toJSON()
+        });
+        
+    } catch (error) {
+        console.error('❌ Create notification error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// ==================== ITEM ARRIVAL NOTIFICATION SYSTEM ====================
+
+// Track processed receipts to avoid duplicate notifications
+const processedReceipts = new Set();
+
+// Check for receipts that need arrival notifications
+async function checkForArrivedItems() {
+    try {
+        const now = new Date();
+        const thirtySecondsAgo = new Date(Date.now() - 30000);
+        
+        console.log('🚚 Checking for items that should have arrived...');
+        console.log(`   Current time: ${now.toISOString()}`);
+        console.log(`   Looking for receipts started before: ${thirtySecondsAgo.toISOString()}`);
+        
+        const [receipts] = await Database.pool.execute(
+            `SELECT r.receipt_id, r.item_id, r.renter_id, r.owner_id, 
+                    r.rental_start_date, r.rental_price, r.created_at,
+                    i.item_name,
+                    renter.user_name as renter_name,
+                    owner.user_name as owner_name,
+                    TIMESTAMPDIFF(SECOND, r.rental_start_date, NOW()) as seconds_since_start
+             FROM receipts r
+             JOIN items i ON r.item_id = i.item_id
+             JOIN users renter ON r.renter_id = renter.user_id
+             JOIN users owner ON r.owner_id = owner.user_id
+             WHERE r.status = 'active'
+             AND r.rental_start_date <= NOW()
+             AND TIMESTAMPDIFF(SECOND, r.rental_start_date, NOW()) >= 30
+             AND TIMESTAMPDIFF(SECOND, r.rental_start_date, NOW()) <= 300`,
+            []
+        );
+        
+        console.log(`📦 Found ${receipts.length} receipts to check`);
+        
+        // Log each receipt with timing details
+        receipts.forEach(receipt => {
+            const rentalStart = new Date(receipt.rental_start_date);
+            const secondsSinceStart = receipt.seconds_since_start;
+            console.log(`   📋 Receipt #${receipt.receipt_id}: "${receipt.item_name}"`);
+            console.log(`      Started: ${rentalStart.toISOString()}`);
+            console.log(`      Time elapsed: ${secondsSinceStart} seconds (from DB)`);
+        });
+        
+        for (const receipt of receipts) {
+            const receiptKey = `${receipt.receipt_id}_arrived`;
+            
+            // Skip if we've already processed this receipt
+            if (processedReceipts.has(receiptKey)) {
+                continue;
+            }
+            
+            // Check if arrival notifications already exist for this receipt
+            const [existingNotifs] = await Database.pool.execute(
+                `SELECT notification_id FROM notifications 
+                 WHERE type = 'item_arrived' 
+                 AND item_id = ? 
+                 AND user_id IN (?, ?)
+                 AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE)`,
+                [receipt.item_id, receipt.renter_id, receipt.owner_id]
+            );
+            
+            if (existingNotifs.length >= 2) {
+                // Both notifications already exist
+                processedReceipts.add(receiptKey);
+                continue;
+            }
+            
+            console.log(`✅ Creating arrival notifications for receipt ${receipt.receipt_id}`);
+            
+            const Notification = require('./classes/Notification');
+            
+            // Create notification for renter
+            const renterNotification = new Notification();
+            renterNotification.setUserId(receipt.renter_id);
+            renterNotification.setType('item_arrived');
+            renterNotification.setTitle('Item Has Arrived! 🎉');
+            renterNotification.setMessage(
+                `Good news! "${receipt.item_name}" has arrived and is ready for you to use. Enjoy your rental!`
+            );
+            renterNotification.setItemId(receipt.item_id);
+            renterNotification.setRelatedUserId(receipt.owner_id);
+            
+            await Database.addNotification(renterNotification);
+            
+            // Create notification for owner
+            const ownerNotification = new Notification();
+            ownerNotification.setUserId(receipt.owner_id);
+            ownerNotification.setType('item_arrived');
+            ownerNotification.setTitle('Item Delivered! 📦');
+            ownerNotification.setMessage(
+                `Your item "${receipt.item_name}" has been delivered to ${receipt.renter_name}. The rental is now active.`
+            );
+            ownerNotification.setItemId(receipt.item_id);
+            ownerNotification.setRelatedUserId(receipt.renter_id);
+            
+            await Database.addNotification(ownerNotification);
+            
+            console.log(`📬 Arrival notifications sent for receipt ${receipt.receipt_id}`);
+            
+            // Mark as processed
+            processedReceipts.add(receiptKey);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error checking for arrived items:', error);
+    }
+}
+
+// Start the arrival notification checker
+function startArrivalNotificationSystem() {
+    console.log('🚀 Starting item arrival notification system...');
+    
+    // Check every 10 seconds
+    setInterval(checkForArrivedItems, 10000);
+    
+    // Run once immediately
+    checkForArrivedItems();
+    
+    console.log('✅ Arrival notification system started (checking every 10 seconds)');
+}
+
+// Clean up old processed receipts from memory (run once per hour)
+setInterval(() => {
+    console.log('🧹 Cleaning up processed receipts cache...');
+    processedReceipts.clear();
+}, 3600000);
+
+app.get('/api/notifications/debug/receipts', async (req, res) => {
+    try {
+        console.log('🔍 DEBUG: Checking all active receipts...');
+        const now = new Date();
+        const thirtySecondsAgo = new Date(Date.now() - 30000);
+        
+        // Get ALL active receipts (no time filter)
+        const [allReceipts] = await Database.pool.execute(
+            `SELECT r.receipt_id, r.item_id, r.renter_id, r.owner_id, 
+                    r.rental_start_date, r.created_at, r.status,
+                    i.item_name,
+                    renter.user_name as renter_name,
+                    owner.user_name as owner_name,
+                    NOW() as current_db_time,
+                    TIMESTAMPDIFF(SECOND, r.rental_start_date, NOW()) as seconds_since_start
+             FROM receipts r
+             JOIN items i ON r.item_id = i.item_id
+             JOIN users renter ON r.renter_id = renter.user_id
+             JOIN users owner ON r.owner_id = owner.user_id
+             WHERE r.status = 'active'
+             ORDER BY r.created_at DESC`
+        );
+        
+        console.log(`Found ${allReceipts.length} active receipts total`);
+        
+        const receiptDetails = allReceipts.map(receipt => {
+            const rentalStart = new Date(receipt.rental_start_date);
+            const created = new Date(receipt.created_at);
+            const dbTime = new Date(receipt.current_db_time);
+            const secondsSinceStart = receipt.seconds_since_start;
+            const shouldTrigger = secondsSinceStart >= 30 && secondsSinceStart <= 300;
+            
+            console.log(`Receipt #${receipt.receipt_id}:`);
+            console.log(`  rental_start_date: ${receipt.rental_start_date}`);
+            console.log(`  DB current time: ${receipt.current_db_time}`);
+            console.log(`  seconds_since_start: ${secondsSinceStart}`);
+            console.log(`  Should trigger: ${shouldTrigger}`);
+            
+            return {
+                receiptId: receipt.receipt_id,
+                itemName: receipt.item_name,
+                renter: receipt.renter_name,
+                owner: receipt.owner_name,
+                rentalStartDate: receipt.rental_start_date,
+                rentalStartISO: rentalStart.toISOString(),
+                createdAt: receipt.created_at,
+                createdISO: created.toISOString(),
+                dbCurrentTime: receipt.current_db_time,
+                currentTime: now.toISOString(),
+                thirtySecondsAgo: thirtySecondsAgo.toISOString(),
+                secondsSinceStart: secondsSinceStart,
+                shouldTriggerArrival: shouldTrigger,
+                eligible: shouldTrigger
+            };
+        });
+        
+        console.log('Receipt details:', receiptDetails);
+        
+        res.json({
+            success: true,
+            currentTime: now.toISOString(),
+            thirtySecondsAgo: thirtySecondsAgo.toISOString(),
+            totalActiveReceipts: allReceipts.length,
+            eligibleForArrival: receiptDetails.filter(r => r.eligible).length,
+            receipts: receiptDetails
+        });
+        
+    } catch (error) {
+        console.error('Debug error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// ==================== START SERVER ====================
+
+app.listen(PORT, () => {
+    console.log('='.repeat(50));
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log('='.repeat(50));
+});
+
+// ==================== INITIALIZE ARRIVAL SYSTEM ====================
+
+// Start the arrival notification system
+startArrivalNotificationSystem();
+
 // ==================== ERROR HANDLING ====================
 
 // 404 handler
@@ -1210,14 +1637,6 @@ app.use((err, req, res, next) => {
     });
 });
 
-// ==================== START SERVER ====================
-
-app.listen(PORT, () => {
-    console.log('='.repeat(50));
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log('='.repeat(50));
-});
 
 // Graceful shutdown
 process.on('SIGINT', async () => {

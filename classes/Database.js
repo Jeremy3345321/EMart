@@ -457,9 +457,16 @@ class Database {
 
     // ==================== RECEIPT METHODS ====================
 
+// ==================== RECEIPT METHODS (ENHANCED LOGGING) ====================
+
     static async addReceipt(receipt) {
         try {
             await this.initialize();
+            
+            const insertTime = new Date();
+            console.log('   💾 Inserting receipt into database...');
+            console.log(`      Insert time: ${insertTime.toISOString()}`);
+            
             const [result] = await this.pool.execute(
                 `INSERT INTO receipts (
                     item_id, owner_id, renter_id, rental_start_date, 
@@ -475,15 +482,23 @@ class Database {
                     receipt.status || 'active'
                 ]
             );
+            
             receipt.receiptId = result.insertId;
-            console.log(`✅ Receipt added: ID ${result.insertId}`);
+            
+            const completedTime = new Date();
+            const dbTime = (completedTime - insertTime) / 1000;
+            
+            console.log(`   ✅ Receipt inserted into database`);
+            console.log(`      Receipt ID: ${result.insertId}`);
+            console.log(`      DB insert time: ${dbTime.toFixed(3)} seconds`);
+            console.log(`      Completed at: ${completedTime.toISOString()}`);
+            
             return receipt;
         } catch (error) {
-            console.error('❌ Error adding receipt:', error.message);
+            console.error('   ❌ Error adding receipt:', error.message);
             throw error;
         }
     }
-
     static async getReceiptById(receiptId) {
         try {
             await this.initialize();
@@ -1043,6 +1058,143 @@ class Database {
         } catch (error) {
             console.error('❌ Error checking if item in cart:', error.message);
             throw error;
+        }
+    }
+
+    // ==================== NOTIFICATION METHODS ====================
+
+    static async addNotification(notification) {
+        try {
+            await this.initialize();
+            const [result] = await this.pool.execute(
+                `INSERT INTO notifications (
+                    user_id, type, title, message, item_id, related_user_id, is_read
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    notification.getUserId(),
+                    notification.getType(),
+                    notification.getTitle(),
+                    notification.getMessage(),
+                    notification.getItemId(),
+                    notification.getRelatedUserId(),
+                    notification.isReadStatus()
+                ]
+            );
+            notification.setNotificationId(result.insertId);
+            console.log(`✅ Notification created: ${notification.getTitle()} (ID: ${result.insertId})`);
+            return notification;
+        } catch (error) {
+            console.error('❌ Error adding notification:', error.message);
+            throw error;
+        }
+    }
+
+    static async getNotificationsByUser(userId, limit = 50) {
+        try {
+            await this.initialize();
+            const [rows] = await this.pool.execute(
+                `SELECT * FROM notifications 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT ?`,
+                [userId, limit]
+            );
+            
+            console.log(`📬 Found ${rows.length} notifications for user ${userId}`);
+            const Notification = require('./Notification');
+            return rows.map(row => {
+                const notification = new Notification();
+                notification.notificationId = row.notification_id;
+                notification.userId = row.user_id;
+                notification.type = row.type;
+                notification.title = row.title;
+                notification.message = row.message;
+                notification.itemId = row.item_id;
+                notification.relatedUserId = row.related_user_id;
+                notification.isRead = row.is_read;
+                notification.createdAt = row.created_at;
+                return notification;
+            });
+        } catch (error) {
+            console.error('❌ Error getting notifications:', error.message);
+            return [];
+        }
+    }
+
+    static async getUnreadNotificationCount(userId) {
+        try {
+            await this.initialize();
+            const [rows] = await this.pool.execute(
+                'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
+                [userId]
+            );
+            
+            const count = rows[0].count;
+            console.log(`📬 User ${userId} has ${count} unread notifications`);
+            return count;
+        } catch (error) {
+            console.error('❌ Error getting unread count:', error.message);
+            return 0;
+        }
+    }
+
+    static async markNotificationAsRead(notificationId) {
+        try {
+            await this.initialize();
+            await this.pool.execute(
+                'UPDATE notifications SET is_read = TRUE WHERE notification_id = ?',
+                [notificationId]
+            );
+            console.log(`✅ Notification ${notificationId} marked as read`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error marking notification as read:', error.message);
+            return false;
+        }
+    }
+
+    static async markAllNotificationsAsRead(userId) {
+        try {
+            await this.initialize();
+            const [result] = await this.pool.execute(
+                'UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE',
+                [userId]
+            );
+            console.log(`✅ Marked ${result.affectedRows} notifications as read for user ${userId}`);
+            return result.affectedRows;
+        } catch (error) {
+            console.error('❌ Error marking all notifications as read:', error.message);
+            return 0;
+        }
+    }
+
+    static async deleteNotification(notificationId) {
+        try {
+            await this.initialize();
+            await this.pool.execute(
+                'DELETE FROM notifications WHERE notification_id = ?',
+                [notificationId]
+            );
+            console.log(`✅ Notification ${notificationId} deleted`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error deleting notification:', error.message);
+            return false;
+        }
+    }
+
+    static async deleteOldNotifications(daysOld = 30) {
+        try {
+            await this.initialize();
+            const [result] = await this.pool.execute(
+                'DELETE FROM notifications WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)',
+                [daysOld]
+            );
+            console.log(`✅ Deleted ${result.affectedRows} old notifications`);
+            return result.affectedRows;
+        } catch (error) {
+            console.error('❌ Error deleting old notifications:', error.message);
+            return 0;
         }
     }
 }

@@ -1,4 +1,4 @@
-// cart.js
+// cart.js - FIXED VERSION with proper async handling
 
 const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
 const API_URL = 'http://localhost:3000/api';
@@ -219,6 +219,42 @@ async function checkout() {
                 
                 if (!receiptData.success) {
                     throw new Error(`Failed to create receipt: ${receiptData.message}`);
+                }
+                
+                // 3. Create notifications for both renter and owner
+                try {
+                    // Notification for renter (current user)
+                    await fetch(`${API_URL}/notifications`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: currentUser.userId,
+                            type: 'rental_started',
+                            title: 'Rental Confirmed!',
+                            message: `You are now renting "${cartItem.name}". Enjoy your rental!`,
+                            itemId: cartItem.id,
+                            relatedUserId: cartItem.ownerId
+                        })
+                    });
+                    
+                    // Notification for owner
+                    await fetch(`${API_URL}/notifications`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: cartItem.ownerId,
+                            type: 'item_rented_out',
+                            title: 'Item Rented Out!',
+                            message: `Your item "${cartItem.name}" is now being rented.`,
+                            itemId: cartItem.id,
+                            relatedUserId: currentUser.userId
+                        })
+                    });
+                    
+                    console.log(`✅ Notifications created for rental of: ${cartItem.name}`);
+                } catch (notifError) {
+                    console.error(`⚠️ Failed to create notifications:`, notifError);
+                    // Don't fail the checkout if notifications fail
                 }
                 
                 checkoutResults.push({
