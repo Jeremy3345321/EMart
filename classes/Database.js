@@ -2,25 +2,33 @@
 
 const mysql = require('mysql2/promise');
 
-// Database configuration
-const dbConfig = {
-    host: 'localhost',
-    user: 'root',
-    password: '', 
-    database: 'e_mart',
-    port: 3306
-};
-
 class Database {
     static pool = null;
 
-    // Initialize the connection pool
     static async initialize() {
-        if (!this.pool) {
-            this.pool = mysql.createPool(dbConfig);
-            console.log('🔌 Database connection pool created');
+        if (this.pool) return;
+
+        try {
+            this.pool = mysql.createPool({
+                host: process.env.DB_HOST || '127.0.0.1',
+                user: process.env.DB_USER || 'root',
+                password: process.env.DB_PASSWORD || '',
+                database: process.env.DB_NAME || 'e_mart',
+                port: process.env.DB_PORT || 3306,
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0
+            });
+
+            // Test connection
+            await this.pool.query('SELECT 1');
+            console.log('✅ Database connected successfully');
+            console.log(`   Host: ${process.env.DB_HOST || '127.0.0.1'}`);
+            console.log(`   Database: ${process.env.DB_NAME || 'e_mart'}`);
+        } catch (error) {
+            console.error('❌ Database connection failed:', error.message);
+            throw error;
         }
-        return this.pool;
     }
 
     // ==================== USER METHODS ====================
@@ -152,8 +160,9 @@ class Database {
             const [result] = await this.pool.execute(
                 `INSERT INTO items (
                     item_name, owner_id, renter_id, is_renting, is_rented, 
-                    item_description, item_price, item_condition, item_tags, item_image_url
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    item_description, item_price, item_condition, item_tags, item_image_url,
+                    item_rating, rating_count, total_rating_points
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     item.getItemName(),
                     item.getOwnerId(),
@@ -164,7 +173,10 @@ class Database {
                     item.getPrice(),
                     item.getCondition(),
                     JSON.stringify(item.getTags()),
-                    item.getImageUrl()
+                    item.getImageUrl(),
+                    item.itemRating,
+                    item.ratingCount,
+                    item.totalRatingPoints
                 ]
             );
             item.setItemId(result.insertId);
@@ -199,6 +211,11 @@ class Database {
                 item.setPrice(rows[0].item_price || 0);
                 item.setCondition(rows[0].item_condition || 'Like New');
                 
+                // Set rating fields
+                item.itemRating = rows[0].item_rating;
+                item.ratingCount = rows[0].rating_count || 0;
+                item.totalRatingPoints = rows[0].total_rating_points || 0;
+                
                 if (rows[0].item_tags) {
                     const tags = JSON.parse(rows[0].item_tags);
                     tags.forEach(tag => item.addTag(tag));
@@ -214,6 +231,7 @@ class Database {
             throw error;
         }
     }
+
 
     // NEW: Get all available items (not rented)
     static async getAvailableItems() {
@@ -406,7 +424,6 @@ class Database {
         }
     }
 
-    // NEW: Update item
     static async updateItem(item) {
         try {
             await this.initialize();
@@ -421,7 +438,10 @@ class Database {
                     item_description = ?,
                     item_price = ?,
                     item_condition = ?,
-                    item_tags = ?
+                    item_tags = ?,
+                    item_rating = ?,
+                    rating_count = ?,
+                    total_rating_points = ?
                 WHERE item_id = ?`,
                 [
                     item.getItemName(),
@@ -434,6 +454,9 @@ class Database {
                     item.getPrice(),
                     item.getCondition(),
                     JSON.stringify(item.getTags()),
+                    item.itemRating,
+                    item.ratingCount,
+                    item.totalRatingPoints,
                     item.getItemId()
                 ]
             );
@@ -444,20 +467,144 @@ class Database {
         }
     }
 
-    static async deleteItem(itemId) {
+    // ==================== RATING METHODS ====================
+
+    // Add rating to an item
+    static async addItemRating(itemId, renterId, rating) {
         try {
             await this.initialize();
-            await this.pool.execute('DELETE FROM items WHERE item_id = ?', [itemId]);
-            console.log(`✅ Item deleted (ID: ${itemId})`);
+            
+            // Validate rating
+            if (rating < 0 || rating > 5) {
+                throw new Error('Rating must be between 0 and 5');
+            }
+            
+            // Check if item exists
+            const item = await this.getItemById(itemId);
+            if (!item) {
+                throw new Error('Item not found');
+            }
+            
+            // Check if user has rented this item (completed rental)
+            const [receipts] = await this.pool.execute(
+                `SELECT r.* FROM receipts r 
+                JOIN items i ON r.item_id = i.item_id 
+                WHERE r.item_id = ? 
+                AND r.renter_id = ? 
+                AND r.status = 'completed'
+                AND i.is_rented = TRUE`,
+                [itemId, renterId]
+            );
+            
+            if (receipts.length === 0) {
+                throw new Error('You can only rate items you have rented and received');
+            }
+            
+            // Check if user already rated this item
+            const [existingRatings] = await this.pool.execute(
+                'SELECT * FROM item_ratings WHERE item_id = ? AND renter_id = ?',
+                [itemId, renterId]
+            );
+            
+            if (existingRatings.length > 0) {
+                // Update existing rating
+                const oldRating = existingRatings[0].rating;
+                await this.pool.execute(
+                    'UPDATE item_ratings SET rating = ?, rated_at = CURRENT_TIMESTAMP WHERE item_id = ? AND renter_id = ?',
+                    [rating, itemId, renterId]
+                );
+                
+                // Update item's rating statistics
+                const newTotalPoints = item.totalRatingPoints - oldRating + rating;
+                const newAvgRating = (newTotalPoints / item.ratingCount).toFixed(1);
+                
+                await this.pool.execute(
+                    'UPDATE items SET item_rating = ?, total_rating_points = ? WHERE item_id = ?',
+                    [newAvgRating, newTotalPoints, itemId]
+                );
+                
+                console.log(`✅ Rating updated for item ${itemId}: ${oldRating} -> ${rating}`);
+            } else {
+                // Add new rating
+                await this.pool.execute(
+                    'INSERT INTO item_ratings (item_id, renter_id, rating) VALUES (?, ?, ?)',
+                    [itemId, renterId, rating]
+                );
+                
+                // Update item's rating statistics
+                const newTotalPoints = item.totalRatingPoints + rating;
+                const newCount = item.ratingCount + 1;
+                const newAvgRating = (newTotalPoints / newCount).toFixed(1);
+                
+                await this.pool.execute(
+                    'UPDATE items SET item_rating = ?, rating_count = ?, total_rating_points = ? WHERE item_id = ?',
+                    [newAvgRating, newCount, newTotalPoints, itemId]
+                );
+                
+                console.log(`✅ New rating added for item ${itemId}: ${rating} (Avg: ${newAvgRating})`);
+            }
+            
+            return true;
         } catch (error) {
-            console.error('❌ Error deleting item:', error.message);
+            console.error('❌ Error adding rating:', error.message);
+            throw error;
+        }
+    }
+
+    // Get user's rating for an item
+    static async getUserRatingForItem(itemId, renterId) {
+        try {
+            await this.initialize();
+            const [rows] = await this.pool.execute(
+                'SELECT * FROM item_ratings WHERE item_id = ? AND renter_id = ?',
+                [itemId, renterId]
+            );
+            
+            return rows.length > 0 ? rows[0] : null;
+        } catch (error) {
+            console.error('❌ Error getting user rating:', error.message);
+            return null;
+        }
+    }
+
+    // Check if user can rate an item (has rented and received it)
+    static async canUserRateItem(itemId, renterId) {
+        try {
+            await this.initialize();
+            const [receipts] = await this.pool.execute(
+                `SELECT r.* FROM receipts r 
+                JOIN items i ON r.item_id = i.item_id 
+                WHERE r.item_id = ? 
+                AND r.renter_id = ? 
+                AND r.status = 'completed'
+                AND i.is_rented = TRUE`,
+                [itemId, renterId]
+            );
+            
+            return receipts.length > 0;
+        } catch (error) {
+            console.error('❌ Error checking rating permission:', error.message);
+            return false;
+        }
+    }
+
+    // Update item to mark as arrived (sets is_rented to true)
+    static async markItemAsArrived(itemId) {
+        try {
+            await this.initialize();
+            await this.pool.execute(
+                'UPDATE items SET is_rented = TRUE WHERE item_id = ?',
+                [itemId]
+            );
+            console.log(`✅ Item ${itemId} marked as arrived (is_rented = TRUE)`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error marking item as arrived:', error.message);
             throw error;
         }
     }
 
     // ==================== RECEIPT METHODS ====================
-
-// ==================== RECEIPT METHODS (ENHANCED LOGGING) ====================
 
     static async addReceipt(receipt) {
         try {

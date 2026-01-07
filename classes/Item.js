@@ -1,3 +1,5 @@
+// Item.js - Updated with rating functionality
+
 class Item {
     static Tag = {
         ELECTRONICS: 'Electronics',
@@ -21,10 +23,15 @@ class Item {
         this.imageUrl = imageUrl;
         this.isRenting = false;
         this.isRented = false;
-        this.itemTags = []; // Array of Item.Tag
+        this.itemTags = [];
         this.description = '';
         this.price = 0;
         this.condition = 'Like New';
+        
+        // Rating properties
+        this.itemRating = null; // Average rating (0.0 to 5.0)
+        this.ratingCount = 0;   // Number of ratings
+        this.totalRatingPoints = 0; // Sum of all ratings
     }
 
     // Getters and Setters
@@ -52,6 +59,21 @@ class Item {
     getCondition() { return this.condition; }
     setCondition(condition) { this.condition = condition; }
 
+    // Rating getters and setters
+    getRating() { return this.itemRating; }
+    getRatingCount() { return this.ratingCount; }
+    
+    // Add a new rating
+    addRating(rating) {
+        if (rating < 0 || rating > 5) {
+            throw new Error('Rating must be between 0 and 5');
+        }
+        
+        this.totalRatingPoints += rating;
+        this.ratingCount += 1;
+        this.itemRating = parseFloat((this.totalRatingPoints / this.ratingCount).toFixed(1));
+    }
+
     // Tag methods
     addTag(tag) {
         if (Object.values(Item.Tag).includes(tag) && !this.itemTags.includes(tag)) {
@@ -74,12 +96,12 @@ class Item {
     // Behaviour methods
     postItem() {
         this.isRenting = true;
-        Database.addItem(this);
+        // Database.addItem(this); // This would be called externally
     }
 
     rentItem(receipt) {
         this.isRented = true;
-        Database.updateItem(this);
+        // Database.updateItem(this); // This would be called externally
     }
 }
 

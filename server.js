@@ -1,5 +1,7 @@
 // server.js
 
+require('dotenv').config(); // This MUST be at the top!
+
 const express = require('express');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
@@ -8,6 +10,7 @@ const path = require('path');
 // Import custom classes
 const Database = require('./classes/Database');
 const User = require('./classes/User');
+const PaymentService = require('./services/PaymentService'); // Add this
 
 const app = express();
 const PORT = 3000;
@@ -716,6 +719,160 @@ app.put('/api/items/:itemId/return', async (req, res) => {
     }
 });
 
+// ==================== RATING ROUTES ====================
+
+// Add/Update rating for an item
+app.post('/api/items/:itemId/rate', async (req, res) => {
+    console.log('⭐ Rating item:', req.params.itemId);
+    try {
+        const { itemId } = req.params;
+        const { renterId, rating } = req.body;
+
+        if (!renterId || rating === undefined) {
+            return res.status(400).json({
+                success: false,
+                message: 'Renter ID and rating are required'
+            });
+        }
+
+        if (rating < 0 || rating > 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Rating must be between 0 and 5'
+            });
+        }
+
+        await Database.addItemRating(itemId, renterId, rating);
+
+        console.log(`✅ Item rated successfully: ${itemId} - ${rating} stars`);
+        res.json({
+            success: true,
+            message: 'Rating submitted successfully'
+        });
+
+    } catch (error) {
+        console.error('❌ Rate item error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Internal server error'
+        });
+    }
+});
+
+// Get user's rating for an item
+app.get('/api/items/:itemId/rating/:renterId', async (req, res) => {
+    console.log('🔍 Getting user rating for item:', req.params.itemId);
+    try {
+        const { itemId, renterId } = req.params;
+
+        const rating = await Database.getUserRatingForItem(itemId, renterId);
+
+        res.json({
+            success: true,
+            data: rating
+        });
+
+    } catch (error) {
+        console.error('❌ Get user rating error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Check if user can rate an item
+app.get('/api/items/:itemId/can-rate/:renterId', async (req, res) => {
+    console.log('✅ Checking rating permission for item:', req.params.itemId);
+    try {
+        const { itemId, renterId } = req.params;
+
+        const canRate = await Database.canUserRateItem(itemId, renterId);
+
+        res.json({
+            success: true,
+            data: { canRate }
+        });
+
+    } catch (error) {
+        console.error('❌ Check rating permission error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Mark item as arrived (sets is_rented to true)
+app.put('/api/items/:itemId/arrived', async (req, res) => {
+    console.log('📦 Marking item as arrived:', req.params.itemId);
+    try {
+        const { itemId } = req.params;
+        const { renterId, renterName } = req.body;
+
+        // Get the item
+        const item = await Database.getItemById(itemId);
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Check if already marked as arrived (is_rented = true)
+        if (item.isRented) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item already marked as arrived'
+            });
+        }
+
+        // Mark as arrived
+        await Database.markItemAsArrived(itemId);
+
+        // Send notifications only if not already arrived
+        const Notification = require('./classes/Notification');
+        
+        // Notification for renter
+        const renterNotif = Notification.createItemArrivedNotificationForRenter(
+            renterId,
+            itemId,
+            item.getItemName(),
+            item.getOwnerId()
+        );
+        await Database.addNotification(renterNotif);
+        
+        // Notification for owner
+        const ownerNotif = Notification.createItemArrivedNotificationForOwner(
+            item.getOwnerId(),
+            itemId,
+            item.getItemName(),
+            renterName,
+            renterId
+        );
+        await Database.addNotification(ownerNotif);
+
+        console.log(`✅ Item marked as arrived: ${item.getItemName()}`);
+        res.json({
+            success: true,
+            message: 'Item marked as arrived',
+            data: {
+                itemId: item.getItemId(),
+                itemName: item.getItemName(),
+                isRented: true
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Mark item as arrived error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
 // ==================== RECEIPT ROUTES ====================
 
 // Create a new receipt
@@ -1409,10 +1566,6 @@ async function checkForArrivedItems() {
         const now = new Date();
         const thirtySecondsAgo = new Date(Date.now() - 30000);
         
-        console.log('🚚 Checking for items that should have arrived...');
-        console.log(`   Current time: ${now.toISOString()}`);
-        console.log(`   Looking for receipts started before: ${thirtySecondsAgo.toISOString()}`);
-        
         const [receipts] = await Database.pool.execute(
             `SELECT r.receipt_id, r.item_id, r.renter_id, r.owner_id, 
                     r.rental_start_date, r.rental_price, r.created_at,
@@ -1437,9 +1590,6 @@ async function checkForArrivedItems() {
         receipts.forEach(receipt => {
             const rentalStart = new Date(receipt.rental_start_date);
             const secondsSinceStart = receipt.seconds_since_start;
-            console.log(`   📋 Receipt #${receipt.receipt_id}: "${receipt.item_name}"`);
-            console.log(`      Started: ${rentalStart.toISOString()}`);
-            console.log(`      Time elapsed: ${secondsSinceStart} seconds (from DB)`);
         });
         
         for (const receipt of receipts) {
@@ -1512,7 +1662,7 @@ function startArrivalNotificationSystem() {
     console.log('🚀 Starting item arrival notification system...');
     
     // Check every 10 seconds
-    setInterval(checkForArrivedItems, 10000);
+    setInterval(checkForArrivedItems, 30000);
     
     // Run once immediately
     checkForArrivedItems();
@@ -1559,10 +1709,6 @@ app.get('/api/notifications/debug/receipts', async (req, res) => {
             const shouldTrigger = secondsSinceStart >= 30 && secondsSinceStart <= 300;
             
             console.log(`Receipt #${receipt.receipt_id}:`);
-            console.log(`  rental_start_date: ${receipt.rental_start_date}`);
-            console.log(`  DB current time: ${receipt.current_db_time}`);
-            console.log(`  seconds_since_start: ${secondsSinceStart}`);
-            console.log(`  Should trigger: ${shouldTrigger}`);
             
             return {
                 receiptId: receipt.receipt_id,
@@ -1602,12 +1748,153 @@ app.get('/api/notifications/debug/receipts', async (req, res) => {
     }
 });
 
+// ==================== HEALTH CHECK ====================
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        message: 'Server is running',
+        environment: process.env.NODE_ENV,
+        stripeMode: PaymentService.isTestMode() ? 'TEST' : 'LIVE'
+    });
+});
+
+// ==================== PAYMENT ROUTES ====================
+
+// Create payment intent for checkout
+app.post('/api/payments/create', async (req, res) => {
+    console.log('💳 Creating payment intent...');
+    try {
+        const { receiptId, userId, amount, currency } = req.body;
+
+        // Validation
+        if (!receiptId || !amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'Receipt ID and amount are required'
+            });
+        }
+
+        // Create payment intent
+        const payment = await PaymentService.createRentalPayment(
+            receiptId,
+            userId,
+            amount,
+            currency || 'PHP'
+        );
+
+        console.log('✅ Payment intent created:', payment.paymentIntentId);
+        res.json({
+            success: true,
+            data: payment
+        });
+
+    } catch (error) {
+        console.error('❌ Payment creation error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Failed to create payment'
+        });
+    }
+});
+
+// Confirm payment (can be called manually or by webhook)
+app.post('/api/payments/confirm', async (req, res) => {
+    console.log('✅ Confirming payment...');
+    try {
+        const { paymentIntentId } = req.body;
+
+        if (!paymentIntentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment intent ID is required'
+            });
+        }
+
+        const receiptId = await PaymentService.confirmRentalPayment(paymentIntentId);
+
+        res.json({
+            success: true,
+            data: { receiptId }
+        });
+
+    } catch (error) {
+        console.error('❌ Payment confirmation error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Process refund
+app.post('/api/payments/refund', async (req, res) => {
+    console.log('💸 Processing refund...');
+    try {
+        const { receiptId, reason, amount } = req.body;
+
+        if (!receiptId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Receipt ID is required'
+            });
+        }
+
+        const refund = await PaymentService.processRefund(
+            receiptId,
+            reason || 'item_recall',
+            amount || null
+        );
+
+        res.json({
+            success: true,
+            data: refund
+        });
+
+    } catch (error) {
+        console.error('❌ Refund error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
+// Stripe webhook endpoint
+app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+
+    try {
+        // In test mode, we can skip signature verification
+        if (PaymentService.isTestMode()) {
+            console.log('📨 Webhook (test mode):', req.body);
+            // Process the event
+            await PaymentService.handleWebhook(req.body);
+        } else {
+            // In production, verify the webhook signature
+            const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+            const event = stripe.webhooks.constructEvent(
+                req.body,
+                sig,
+                process.env.STRIPE_WEBHOOK_SECRET
+            );
+            await PaymentService.handleWebhook(event);
+        }
+
+        res.json({ received: true });
+    } catch (error) {
+        console.error('❌ Webhook error:', error);
+        res.status(400).send(`Webhook Error: ${error.message}`);
+    }
+});
+
+
 // ==================== START SERVER ====================
 
 app.listen(PORT, () => {
     console.log('='.repeat(50));
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`💳 Stripe Mode: ${PaymentService.isTestMode() ? 'TEST' : 'LIVE'}`);
     console.log('='.repeat(50));
 });
 

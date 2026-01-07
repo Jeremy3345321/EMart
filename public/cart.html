@@ -165,8 +165,75 @@
         </div>
     </div>
 
+    <!-- Stripe Payment Modal -->
+    <div class="payment-modal-overlay" id="paymentModal">
+        <div class="payment-modal">
+            <div class="payment-modal-header">
+                <h2>Complete Payment</h2>
+                <button class="payment-modal-close" id="closePaymentModal">&times;</button>
+            </div>
+            
+            <div class="payment-modal-body">
+                <!-- Order Summary -->
+                <div class="payment-summary">
+                    <h3>Order Summary</h3>
+                    <div class="payment-summary-items" id="paymentSummaryItems">
+                        <!-- Items will be inserted here -->
+                    </div>
+                    <div class="payment-summary-total">
+                        <span>Total Amount:</span>
+                        <span class="payment-amount" id="paymentAmount">₱0.00</span>
+                    </div>
+                </div>
+
+                <!-- Stripe Card Element -->
+                <div class="payment-form">
+                    <h3>Payment Information</h3>
+                    
+                    <!-- Test Mode Notice -->
+                    <div class="test-mode-notice" id="testModeNotice" style="display: none;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <div>
+                            <strong>Test Mode</strong>
+                            <p>Use test card: 4242 4242 4242 4242 | Exp: 12/34 | CVC: 123</p>
+                        </div>
+                    </div>
+
+                    <form id="paymentForm">
+                        <!-- Stripe Card Element will be inserted here -->
+                        <div id="cardElement" class="card-element"></div>
+                        
+                        <!-- Card Errors -->
+                        <div id="cardErrors" class="card-errors"></div>
+
+                        <!-- Pay Button -->
+                        <button type="submit" class="btn-pay" id="submitPayment">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
+                            </svg>
+                            Pay Now
+                        </button>
+                    </form>
+
+                    <!-- Processing Overlay -->
+                    <div class="processing-overlay" id="processingOverlay" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Processing your payment...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
     <script src="scripts/notification-manager.js"></script>
     <script src="scripts/cart-manager.js"></script>
+    <script src="scripts/stripe-payment.js"></script>
     <script src="scripts/cart.js"></script>
 </body>
 </html>

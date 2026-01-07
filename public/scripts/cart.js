@@ -1,4 +1,4 @@
-// cart.js - FIXED VERSION with proper async handling
+// cart.js - Complete version with Stripe payment integration
 
 const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
 const API_URL = 'http://localhost:3000/api';
@@ -57,7 +57,6 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 async function renderCart() {
     console.log('🔄 Rendering cart...');
     
-    // FIXED: Properly await the async function
     cart = await cartManager.getCart();
     console.log('📦 Cart data:', cart);
     
@@ -124,7 +123,7 @@ async function renderCart() {
 // Update cart total
 function updateCartTotal() {
     const totalAmount = cart.reduce((sum, item) => sum + parseFloat(item.price || 0), 0);
-    const shippingFee = cart.length > 0 ? 50 : 0; // ₱50 flat shipping fee
+    const shippingFee = cart.length > 0 ? 50 : 0;
     const finalTotal = totalAmount + shippingFee;
     
     itemCount.textContent = cart.length;
@@ -158,7 +157,9 @@ clearCartBtn.addEventListener('click', async function() {
     }
 });
 
-// Checkout process
+// ========================================
+// UPDATED CHECKOUT WITH STRIPE PAYMENT
+// ========================================
 async function checkout() {
     console.log('💳 Starting checkout...');
     
@@ -167,7 +168,6 @@ async function checkout() {
         return;
     }
     
-    // Show loading state
     checkoutBtn.disabled = true;
     const originalHTML = checkoutBtn.innerHTML;
     checkoutBtn.innerHTML = '<span>Processing...</span>';
@@ -175,32 +175,16 @@ async function checkout() {
     try {
         const rentalStartDate = new Date();
         const rentalEndDate = new Date();
-        rentalEndDate.setDate(rentalEndDate.getDate() + 7); // Default 7 days rental
+        rentalEndDate.setDate(rentalEndDate.getDate() + 7);
         
-        const checkoutResults = [];
+        const receipts = [];
         
-        // Process each item in cart
+        // Step 1: Create receipts with 'pending_payment' status
+        console.log('📝 Creating receipts...');
         for (const cartItem of cart) {
             try {
-                console.log(`Processing: ${cartItem.name} (ID: ${cartItem.id})`);
+                console.log(`Creating receipt for: ${cartItem.name}`);
                 
-                // 1. Update item status to rented
-                const updateResponse = await fetch(`${API_URL}/items/${cartItem.id}/rent`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        renterId: currentUser.userId,
-                        isRented: true
-                    })
-                });
-                
-                const updateData = await updateResponse.json();
-                
-                if (!updateData.success) {
-                    throw new Error(`Failed to update item: ${updateData.message}`);
-                }
-                
-                // 2. Create receipt
                 const receiptResponse = await fetch(`${API_URL}/receipts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -211,7 +195,7 @@ async function checkout() {
                         rentalStartDate: rentalStartDate.toISOString(),
                         rentalEndDate: rentalEndDate.toISOString(),
                         rentalPrice: cartItem.price,
-                        status: 'active'
+                        status: 'pending_payment' // IMPORTANT: pending until paid
                     })
                 });
                 
@@ -221,88 +205,51 @@ async function checkout() {
                     throw new Error(`Failed to create receipt: ${receiptData.message}`);
                 }
                 
-                // 3. Create notifications for both renter and owner
-                try {
-                    // Notification for renter (current user)
-                    await fetch(`${API_URL}/notifications`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId: currentUser.userId,
-                            type: 'rental_started',
-                            title: 'Rental Confirmed!',
-                            message: `You are now renting "${cartItem.name}". Enjoy your rental!`,
-                            itemId: cartItem.id,
-                            relatedUserId: cartItem.ownerId
-                        })
-                    });
-                    
-                    // Notification for owner
-                    await fetch(`${API_URL}/notifications`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            userId: cartItem.ownerId,
-                            type: 'item_rented_out',
-                            title: 'Item Rented Out!',
-                            message: `Your item "${cartItem.name}" is now being rented.`,
-                            itemId: cartItem.id,
-                            relatedUserId: currentUser.userId
-                        })
-                    });
-                    
-                    console.log(`✅ Notifications created for rental of: ${cartItem.name}`);
-                } catch (notifError) {
-                    console.error(`⚠️ Failed to create notifications:`, notifError);
-                    // Don't fail the checkout if notifications fail
-                }
-                
-                checkoutResults.push({
-                    success: true,
+                receipts.push({
+                    receiptId: receiptData.data.receiptId,
+                    itemId: cartItem.id,
                     itemName: cartItem.name,
-                    receiptId: receiptData.data.receiptId
+                    amount: cartItem.price
                 });
                 
-                console.log(`✅ Successfully rented: ${cartItem.name}`);
+                console.log(`✅ Receipt created: ${receiptData.data.receiptId}`);
                 
-            } catch (itemError) {
-                console.error(`Error processing ${cartItem.name}:`, itemError);
-                checkoutResults.push({
-                    success: false,
-                    itemName: cartItem.name,
-                    error: itemError.message
-                });
+            } catch (error) {
+                console.error(`Error creating receipt for ${cartItem.name}:`, error);
+                throw error;
             }
         }
         
-        // Check results
-        const successCount = checkoutResults.filter(r => r.success).length;
-        const failCount = checkoutResults.filter(r => !r.success).length;
+        // Step 2: Calculate totals
+        const subtotalAmount = cart.reduce((sum, item) => sum + parseFloat(item.price || 0), 0);
+        const shippingFee = 50;
+        const totalAmount = subtotalAmount + shippingFee;
         
-        if (successCount > 0) {
-            // Clear cart of successfully rented items
-            for (const result of checkoutResults.filter(r => r.success)) {
-                const cartItem = cart.find(i => i.name === result.itemName);
-                if (cartItem) {
-                    await cartManager.removeFromCart(cartItem.id);
-                }
-            }
-            
-            // Show success message
-            if (failCount === 0) {
-                alert(`Success! All ${successCount} items have been rented. Check your receipts for details.`);
-                window.location.href = 'receipts.html';
-            } else {
-                alert(`Partially successful: ${successCount} items rented, ${failCount} failed. Check console for details.`);
-                await renderCart();
-            }
-        } else {
-            alert('Checkout failed. Please try again or contact support.');
-        }
+        console.log('💰 Totals calculated:', {
+            subtotal: subtotalAmount,
+            shipping: shippingFee,
+            total: totalAmount
+        });
+        
+        // Step 3: Show Stripe payment modal
+        console.log('🎨 Opening payment modal...');
+        stripePayment.showPaymentModal({
+            items: cart.map(item => ({
+                name: item.name,
+                price: item.price
+            })),
+            receipts: receipts,
+            shipping: shippingFee,
+            subtotal: subtotalAmount,
+            totalAmount: totalAmount,
+            isTestMode: true
+        });
+        
+        console.log('✅ Payment modal opened successfully');
         
     } catch (error) {
         console.error('❌ Checkout error:', error);
-        alert('An error occurred during checkout. Please try again.');
+        alert(`Checkout failed: ${error.message}`);
     } finally {
         checkoutBtn.disabled = false;
         checkoutBtn.innerHTML = originalHTML;
