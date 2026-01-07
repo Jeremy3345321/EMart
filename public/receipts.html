@@ -171,6 +171,135 @@
         </div>
     </div>
 
+    <!-- Item & Receipt Modal -->
+    <div class="modal-overlay" id="itemReceiptModal">
+        <div class="modal-container">
+            <!-- Modal Header -->
+            <div class="modal-header">
+                <h2 class="modal-title">Item & Receipt Details</h2>
+                <button class="modal-close" id="closeModal" aria-label="Close modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body" id="modalBody">
+                <!-- Loading State -->
+                <div class="modal-loading" id="modalLoading">
+                    <div class="modal-spinner"></div>
+                    <p class="modal-loading-text">Loading details...</p>
+                </div>
+
+                <!-- Content (will be populated by JavaScript) -->
+                <div id="modalContent" style="display: none;">
+                    <!-- Item Section -->
+                    <div class="modal-item-section">
+                        <h3 class="modal-section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                            </svg>
+                            Item Information
+                        </h3>
+                        <div class="modal-item-content">
+                            <img id="modalItemImage" class="modal-item-image" src="" alt="Item image">
+                            <div class="modal-item-details">
+                                <h4 class="modal-item-name" id="modalItemName"></h4>
+                                <p class="modal-item-description" id="modalItemDescription"></p>
+                                
+                                <div class="modal-detail-row">
+                                    <span class="modal-detail-label">Price</span>
+                                    <span class="modal-detail-value price" id="modalItemPrice"></span>
+                                </div>
+                                
+                                <div class="modal-detail-row">
+                                    <span class="modal-detail-label">Rental Duration</span>
+                                    <span class="modal-detail-value" id="modalItemDuration"></span>
+                                </div>
+                                
+                                <div class="modal-detail-row">
+                                    <span class="modal-detail-label">Condition</span>
+                                    <span class="modal-detail-value">
+                                        <span class="modal-condition-badge" id="modalItemCondition"></span>
+                                    </span>
+                                </div>
+                                
+                                <div class="modal-detail-row">
+                                    <span class="modal-detail-label">Rating</span>
+                                    <span class="modal-detail-value" id="modalItemRating"></span>
+                                </div>
+                                
+                                <div class="modal-detail-row">
+                                    <span class="modal-detail-label">Owner ID</span>
+                                    <span class="modal-detail-value" id="modalItemOwner"></span>
+                                </div>
+                                
+                                <div class="modal-item-tags" id="modalItemTags"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Receipt Section -->
+                    <div class="modal-receipt-section">
+                        <h3 class="modal-section-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                            Receipt Information
+                        </h3>
+                        <div class="modal-receipt-grid">
+                            <div class="modal-receipt-field">
+                                <span class="modal-detail-label">Receipt ID</span>
+                                <span class="modal-detail-value" id="modalReceiptId"></span>
+                            </div>
+                            
+                            <div class="modal-receipt-field">
+                                <span class="modal-detail-label">Rental Price</span>
+                                <span class="modal-detail-value price" id="modalReceiptPrice"></span>
+                            </div>
+                            
+                            <div class="modal-receipt-field">
+                                <span class="modal-detail-label">Start Date</span>
+                                <span class="modal-detail-value" id="modalReceiptStart"></span>
+                            </div>
+                            
+                            <div class="modal-receipt-field">
+                                <span class="modal-detail-label">End Date</span>
+                                <span class="modal-detail-value" id="modalReceiptEnd"></span>
+                            </div>
+                            
+                            <div class="modal-receipt-field">
+                                <span class="modal-detail-label">Rental Duration</span>
+                                <span class="modal-detail-value" id="modalReceiptDuration"></span>
+                            </div>
+                            
+                            <div class="modal-receipt-field">
+                                <span class="modal-detail-label">Created Date</span>
+                                <span class="modal-detail-value" id="modalReceiptCreated"></span>
+                            </div>
+                            
+                            <div class="modal-receipt-status">
+                                <span class="modal-status-badge" id="modalReceiptStatus"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" id="closeModalBtn">Close</button>
+                <button class="modal-btn modal-btn-primary" id="viewFullItem">View Full Item</button>
+            </div>
+        </div>
+    </div>
+
     <script src="scripts/notification-manager.js"></script>
     <script src="scripts/receipts.js"></script>
 </body>

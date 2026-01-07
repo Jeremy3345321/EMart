@@ -16,7 +16,8 @@ const app = express();
 const PORT = 3000;
 
 // Middleware (ORDER MATTERS!)
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 app.use(express.static('public')); // Serve static files (HTML, CSS, JS, images)
 
@@ -309,7 +310,13 @@ app.get('/api/items/available', async (req, res) => {
                 condition: item.getCondition(),
                 tags: item.getTags(),
                 isRenting: item.isRenting,
-                isRented: item.isRented
+                isRented: item.isRented,
+                // NEW: Include duration fields
+                rentalDuration: item.getRentalDuration(),
+                rentalDurationUnit: item.getRentalDurationUnit(),
+                minRentalDuration: item.getMinRentalDuration(),
+                maxRentalDuration: item.getMaxRentalDuration(),
+                formattedDuration: item.getFormattedDuration()
             }))
         });
     } catch (error) {
@@ -322,10 +329,17 @@ app.get('/api/items/available', async (req, res) => {
     }
 });
 
+// Post new item
 app.post('/api/items', async (req, res) => {
     console.log('📦 Posting new item');
     try {
-        const { itemName, ownerId, renterId, description, price, condition, tags, isRenting, isRented, imageUrl } = req.body;
+        const { 
+            itemName, ownerId, renterId, description, price, condition, tags, 
+            isRenting, isRented, imageUrl,
+            // NEW: Duration fields
+            rentalDuration, rentalDurationUnit, 
+            minRentalDuration, maxRentalDuration
+        } = req.body;
 
         // Validation
         if (!itemName || !ownerId || !description || !price || !condition || !tags || tags.length === 0) {
@@ -333,6 +347,23 @@ app.post('/api/items', async (req, res) => {
             return res.status(400).json({ 
                 success: false, 
                 message: 'Item name, description, price, condition, and at least one tag are required' 
+            });
+        }
+
+        // NEW: Validate duration
+        if (!rentalDuration || rentalDuration <= 0) {
+            console.log('❌ Post item failed: Invalid rental duration');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Valid rental duration is required' 
+            });
+        }
+
+        if (!rentalDurationUnit) {
+            console.log('❌ Post item failed: Missing duration unit');
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Duration unit is required' 
             });
         }
 
@@ -353,8 +384,18 @@ app.post('/api/items', async (req, res) => {
         newItem.setPrice(price);
         newItem.setCondition(condition);
         tags.forEach(tag => newItem.addTag(tag));
-        newItem.isRenting = isRenting !== false; // Default true for posting
+        newItem.isRenting = isRenting !== false;
         newItem.isRented = isRented || false;
+
+        // NEW: Set duration fields
+        newItem.setRentalDuration(rentalDuration);
+        newItem.setRentalDurationUnit(rentalDurationUnit);
+        if (minRentalDuration) {
+            newItem.setMinRentalDuration(minRentalDuration);
+        }
+        if (maxRentalDuration) {
+            newItem.setMaxRentalDuration(maxRentalDuration);
+        }
 
         // Add item to database
         await Database.addItem(newItem);
@@ -365,7 +406,10 @@ app.post('/api/items', async (req, res) => {
             message: 'Item posted successfully',
             data: {
                 itemId: newItem.getItemId(),
-                itemName: newItem.getItemName()
+                itemName: newItem.getItemName(),
+                rentalDuration: newItem.getRentalDuration(),
+                rentalDurationUnit: newItem.getRentalDurationUnit(),
+                formattedDuration: newItem.getFormattedDuration()
             }
         });
 
@@ -373,7 +417,57 @@ app.post('/api/items', async (req, res) => {
         console.error('❌ Post item error:', error);
         res.status(500).json({ 
             success: false, 
-            message: 'Internal server error' 
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Get single item by ID
+app.get('/api/items/:itemId', async (req, res) => {
+    console.log('🔍 Fetching item:', req.params.itemId);
+    try {
+        const itemId = req.params.itemId;
+        const item = await Database.getItemById(itemId);
+
+        if (!item) {
+            console.log('❌ Item not found:', itemId);
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        console.log('✅ Item found:', item.getItemName());
+        res.json({
+            success: true,
+            data: {
+                itemId: item.getItemId(),
+                itemName: item.getItemName(),
+                ownerId: item.getOwnerId(),
+                renterId: item.getRenterId(),
+                imageUrl: item.getImageUrl(),
+                description: item.getDescription(),
+                price: item.getPrice(),
+                condition: item.getCondition(),
+                tags: item.getTags(),
+                isRenting: item.isRenting,
+                isRented: item.isRented,
+                rating: item.getRating(),
+                ratingCount: item.getRatingCount(),
+                // NEW: Duration fields
+                rentalDuration: item.getRentalDuration(),
+                rentalDurationUnit: item.getRentalDurationUnit(),
+                minRentalDuration: item.getMinRentalDuration(),
+                maxRentalDuration: item.getMaxRentalDuration(),
+                formattedDuration: item.getFormattedDuration()
+            }
+        });
+    } catch (error) {
+        console.error('❌ Get item error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
         });
     }
 });
@@ -384,7 +478,6 @@ app.get('/api/items/category/:category', async (req, res) => {
     try {
         const category = req.params.category;
         
-        // Validate category
         const Item = require('./classes/Item');
         if (!Object.values(Item.Tag).includes(category)) {
             console.log('❌ Invalid category:', category);
@@ -409,7 +502,10 @@ app.get('/api/items/category/:category', async (req, res) => {
                 condition: item.getCondition(),
                 tags: item.getTags(),
                 isRenting: item.isRenting,
-                isRented: item.isRented
+                isRented: item.isRented,
+                rentalDuration: item.getRentalDuration(),
+                rentalDurationUnit: item.getRentalDurationUnit(),
+                formattedDuration: item.getFormattedDuration()
             }))
         });
     } catch (error) {
@@ -437,7 +533,11 @@ app.get('/api/items/owner/:ownerId', async (req, res) => {
                 ownerId: item.getOwnerId(),
                 renterId: item.getRenterId(),
                 isRenting: item.isRenting,
-                isRented: item.isRented
+                isRented: item.isRented,
+                price: item.getPrice(),
+                rentalDuration: item.getRentalDuration(),
+                rentalDurationUnit: item.getRentalDurationUnit(),
+                formattedDuration: item.getFormattedDuration()
             }))
         });
 
@@ -466,7 +566,11 @@ app.get('/api/items/renter/:renterId', async (req, res) => {
                 ownerId: item.getOwnerId(),
                 renterId: item.getRenterId(),
                 isRenting: item.isRenting,
-                isRented: item.isRented
+                isRented: item.isRented,
+                price: item.getPrice(),
+                rentalDuration: item.getRentalDuration(),
+                rentalDurationUnit: item.getRentalDurationUnit(),
+                formattedDuration: item.getFormattedDuration()
             }))
         });
 
@@ -475,6 +579,58 @@ app.get('/api/items/renter/:renterId', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 
+        });
+    }
+});
+
+// Update item
+app.put('/api/items/:itemId', async (req, res) => {
+    console.log('✏️ Updating item:', req.params.itemId);
+    try {
+        const { itemId } = req.params;
+        const updates = req.body;
+
+        // Get existing item
+        const existingItem = await Database.getItemById(itemId);
+        if (!existingItem) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Update fields
+        if (updates.itemName !== undefined) existingItem.setItemName(updates.itemName);
+        if (updates.description !== undefined) existingItem.setDescription(updates.description);
+        if (updates.price !== undefined) existingItem.setPrice(updates.price);
+        if (updates.condition !== undefined) existingItem.setCondition(updates.condition);
+        if (updates.rentalDuration !== undefined) existingItem.setRentalDuration(updates.rentalDuration);
+        if (updates.rentalDurationUnit !== undefined) existingItem.setRentalDurationUnit(updates.rentalDurationUnit);
+        if (updates.minRentalDuration !== undefined) existingItem.setMinRentalDuration(updates.minRentalDuration);
+        if (updates.maxRentalDuration !== undefined) existingItem.setMaxRentalDuration(updates.maxRentalDuration);
+        if (updates.isRenting !== undefined) existingItem.isRenting = updates.isRenting;
+        if (updates.isRented !== undefined) existingItem.isRented = updates.isRented;
+        if (updates.renterId !== undefined) existingItem.setRenterId(updates.renterId);
+
+        // Save to database
+        await Database.updateItem(existingItem);
+
+        console.log('✅ Item updated successfully');
+        res.json({
+            success: true,
+            message: 'Item updated successfully',
+            data: {
+                itemId: existingItem.getItemId(),
+                itemName: existingItem.getItemName()
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Update item error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
         });
     }
 });
@@ -976,6 +1132,76 @@ app.put('/api/receipts/:receiptId/status', async (req, res) => {
             data: { receiptId, status }
         });
 
+    } catch (error) {
+        console.error('❌ Update receipt status error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
+
+// Get single receipt by ID
+app.get('/api/receipts/:receiptId', async (req, res) => {
+    console.log('📄 Fetching receipt:', req.params.receiptId);
+    try {
+        const receiptId = req.params.receiptId;
+        const receipt = await Database.getReceiptById(receiptId);
+
+        if (!receipt) {
+            console.log('❌ Receipt not found:', receiptId);
+            return res.status(404).json({
+                success: false,
+                message: 'Receipt not found'
+            });
+        }
+
+        console.log('✅ Receipt found:', receipt.receiptId);
+        res.json({
+            success: true,
+            data: {
+                receiptId: receipt.receiptId,
+                itemId: receipt.itemId,
+                ownerId: receipt.ownerId,
+                renterId: receipt.renterId,
+                rentalStartDate: receipt.rentalStartDate,
+                rentalEndDate: receipt.rentalEndDate,
+                rentalPrice: receipt.rentalPrice,
+                status: receipt.status,
+                createdAt: receipt.createdAt
+            }
+        });
+    } catch (error) {
+        console.error('❌ Get receipt error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error'
+        });
+    }
+});
+
+// Update receipt status
+app.put('/api/receipts/:receiptId/status', async (req, res) => {
+    console.log('✏️ Updating receipt status:', req.params.receiptId);
+    try {
+        const { receiptId } = req.params;
+        const { status } = req.body;
+
+        if (!status) {
+            return res.status(400).json({
+                success: false,
+                message: 'Status is required'
+            });
+        }
+
+        await Database.updateReceiptStatus(receiptId, status);
+
+        console.log(`✅ Receipt status updated: ${receiptId} -> ${status}`);
+        res.json({
+            success: true,
+            message: 'Receipt status updated successfully'
+        });
     } catch (error) {
         console.error('❌ Update receipt status error:', error);
         res.status(500).json({
@@ -1583,8 +1809,6 @@ async function checkForArrivedItems() {
              AND TIMESTAMPDIFF(SECOND, r.rental_start_date, NOW()) <= 300`,
             []
         );
-        
-        console.log(`📦 Found ${receipts.length} receipts to check`);
         
         // Log each receipt with timing details
         receipts.forEach(receipt => {

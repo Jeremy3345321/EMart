@@ -1,4 +1,4 @@
-// Item.js - Updated with rating functionality
+// Item.js - Updated with rental duration functionality
 
 class Item {
     static Tag = {
@@ -13,6 +13,14 @@ class Item {
         BABY_KIDS: 'Baby & Kids',
         OFFICE_SCHOOL: 'Office & School',
         PARTY_EVENTS: 'Party & Events'
+    };
+
+    // Rental duration units
+    static DurationUnit = {
+        HOUR: 'hour',
+        DAY: 'day',
+        WEEK: 'week',
+        MONTH: 'month'
     };
         
     constructor(itemId = null, itemName = null, ownerId = null, renterId = null, imageUrl = null) {
@@ -29,12 +37,18 @@ class Item {
         this.condition = 'Like New';
         
         // Rating properties
-        this.itemRating = null; // Average rating (0.0 to 5.0)
-        this.ratingCount = 0;   // Number of ratings
-        this.totalRatingPoints = 0; // Sum of all ratings
+        this.itemRating = null;
+        this.ratingCount = 0;
+        this.totalRatingPoints = 0;
+        
+        // NEW: Rental duration properties
+        this.rentalDuration = 1; // Default 1 unit
+        this.rentalDurationUnit = Item.DurationUnit.DAY; // Default to days
+        this.maxRentalDuration = null; // Optional max duration (in same unit)
+        this.minRentalDuration = null; // Optional min duration (in same unit)
     }
 
-    // Getters and Setters
+    // Existing getters and setters...
     getItemId() { return this.itemId; }
     setItemId(id) { this.itemId = id; }
     
@@ -59,11 +73,85 @@ class Item {
     getCondition() { return this.condition; }
     setCondition(condition) { this.condition = condition; }
 
-    // Rating getters and setters
     getRating() { return this.itemRating; }
     getRatingCount() { return this.ratingCount; }
-    
-    // Add a new rating
+
+    // NEW: Rental duration getters and setters
+    getRentalDuration() { return this.rentalDuration; }
+    setRentalDuration(duration) { 
+        if (duration <= 0) {
+            throw new Error('Rental duration must be greater than 0');
+        }
+        this.rentalDuration = duration; 
+    }
+
+    getRentalDurationUnit() { return this.rentalDurationUnit; }
+    setRentalDurationUnit(unit) {
+        if (!Object.values(Item.DurationUnit).includes(unit)) {
+            throw new Error('Invalid duration unit');
+        }
+        this.rentalDurationUnit = unit;
+    }
+
+    getMaxRentalDuration() { return this.maxRentalDuration; }
+    setMaxRentalDuration(duration) {
+        if (duration !== null && duration <= 0) {
+            throw new Error('Max rental duration must be greater than 0');
+        }
+        this.maxRentalDuration = duration;
+    }
+
+    getMinRentalDuration() { return this.minRentalDuration; }
+    setMinRentalDuration(duration) {
+        if (duration !== null && duration <= 0) {
+            throw new Error('Min rental duration must be greater than 0');
+        }
+        this.minRentalDuration = duration;
+    }
+
+    // NEW: Get formatted duration string
+    getFormattedDuration() {
+        const plural = this.rentalDuration > 1 ? 's' : '';
+        return `${this.rentalDuration} ${this.rentalDurationUnit}${plural}`;
+    }
+
+    // NEW: Calculate total price based on rental period
+    calculateTotalPrice(requestedDuration, requestedUnit) {
+        // Convert requested duration to item's base unit for calculation
+        const requestedInBaseDays = this.convertToBaseDays(requestedDuration, requestedUnit);
+        const itemBaseDays = this.convertToBaseDays(this.rentalDuration, this.rentalDurationUnit);
+        
+        // Calculate price per day rate
+        const pricePerDay = this.price / itemBaseDays;
+        
+        // Calculate total
+        return pricePerDay * requestedInBaseDays;
+    }
+
+    // Helper: Convert any duration to days for calculation
+    convertToBaseDays(duration, unit) {
+        switch(unit) {
+            case Item.DurationUnit.HOUR: return duration / 24;
+            case Item.DurationUnit.DAY: return duration;
+            case Item.DurationUnit.WEEK: return duration * 7;
+            case Item.DurationUnit.MONTH: return duration * 30; // Approximate
+            default: return duration;
+        }
+    }
+
+    // Validate if requested duration is within allowed range
+    isValidRentalPeriod(requestedDuration, requestedUnit) {
+        // Convert to base unit for comparison
+        const requested = this.convertToBaseDays(requestedDuration, requestedUnit);
+        const min = this.minRentalDuration ? 
+            this.convertToBaseDays(this.minRentalDuration, this.rentalDurationUnit) : 0;
+        const max = this.maxRentalDuration ? 
+            this.convertToBaseDays(this.maxRentalDuration, this.rentalDurationUnit) : Infinity;
+        
+        return requested >= min && requested <= max;
+    }
+
+    // Existing methods...
     addRating(rating) {
         if (rating < 0 || rating > 5) {
             throw new Error('Rating must be between 0 and 5');
@@ -74,7 +162,6 @@ class Item {
         this.itemRating = parseFloat((this.totalRatingPoints / this.ratingCount).toFixed(1));
     }
 
-    // Tag methods
     addTag(tag) {
         if (Object.values(Item.Tag).includes(tag) && !this.itemTags.includes(tag)) {
             this.itemTags.push(tag);
@@ -93,15 +180,12 @@ class Item {
         return this.itemTags.includes(tag);
     }
 
-    // Behaviour methods
     postItem() {
         this.isRenting = true;
-        // Database.addItem(this); // This would be called externally
     }
 
     rentItem(receipt) {
         this.isRented = true;
-        // Database.updateItem(this); // This would be called externally
     }
 }
 

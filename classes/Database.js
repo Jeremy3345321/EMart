@@ -153,7 +153,7 @@ class Database {
     }
 
     // ==================== ITEM METHODS ====================
-    
+        
     static async addItem(item) {
         try {
             await this.initialize();
@@ -161,8 +161,9 @@ class Database {
                 `INSERT INTO items (
                     item_name, owner_id, renter_id, is_renting, is_rented, 
                     item_description, item_price, item_condition, item_tags, item_image_url,
-                    item_rating, rating_count, total_rating_points
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    item_rating, rating_count, total_rating_points,
+                    rental_duration, rental_duration_unit, min_rental_duration, max_rental_duration
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     item.getItemName(),
                     item.getOwnerId(),
@@ -176,7 +177,11 @@ class Database {
                     item.getImageUrl(),
                     item.itemRating,
                     item.ratingCount,
-                    item.totalRatingPoints
+                    item.totalRatingPoints,
+                    item.getRentalDuration(),
+                    item.getRentalDurationUnit(),
+                    item.getMinRentalDuration(),
+                    item.getMaxRentalDuration()
                 ]
             );
             item.setItemId(result.insertId);
@@ -216,6 +221,12 @@ class Database {
                 item.ratingCount = rows[0].rating_count || 0;
                 item.totalRatingPoints = rows[0].total_rating_points || 0;
                 
+                // NEW: Set rental duration fields
+                item.rentalDuration = rows[0].rental_duration || 1;
+                item.rentalDurationUnit = rows[0].rental_duration_unit || 'day';
+                item.minRentalDuration = rows[0].min_rental_duration;
+                item.maxRentalDuration = rows[0].max_rental_duration;
+                
                 if (rows[0].item_tags) {
                     const tags = JSON.parse(rows[0].item_tags);
                     tags.forEach(tag => item.addTag(tag));
@@ -232,8 +243,41 @@ class Database {
         }
     }
 
+    // Helper function to map database rows to Item objects
+    static mapRowToItem(row) {
+        const Item = require('./Item');
+        const item = new Item(
+            row.item_id,
+            row.item_name,
+            row.owner_id,
+            row.renter_id,
+            row.item_image_url
+        );
+        item.isRenting = row.is_renting;
+        item.isRented = row.is_rented;
+        item.setDescription(row.item_description || '');
+        item.setPrice(row.item_price || 0);
+        item.setCondition(row.item_condition || 'Like New');
+        
+        // Rating fields
+        item.itemRating = row.item_rating;
+        item.ratingCount = row.rating_count || 0;
+        item.totalRatingPoints = row.total_rating_points || 0;
+        
+        // Duration fields
+        item.rentalDuration = row.rental_duration || 1;
+        item.rentalDurationUnit = row.rental_duration_unit || 'day';
+        item.minRentalDuration = row.min_rental_duration;
+        item.maxRentalDuration = row.max_rental_duration;
+        
+        if (row.item_tags) {
+            const tags = JSON.parse(row.item_tags);
+            tags.forEach(tag => item.addTag(tag));
+        }
+        
+        return item;
+    }
 
-    // NEW: Get all available items (not rented)
     static async getAvailableItems() {
         try {
             await this.initialize();
@@ -242,35 +286,13 @@ class Database {
             );
             
             console.log(`📦 Found ${rows.length} available items`);
-            const Item = require('./Item');
-            return rows.map(row => {
-                const item = new Item(
-                    row.item_id,
-                    row.item_name,
-                    row.owner_id,
-                    row.renter_id,
-                    row.item_image_url
-                );
-                item.isRenting = row.is_renting;
-                item.isRented = row.is_rented;
-                item.setDescription(row.item_description || '');
-                item.setPrice(row.item_price || 0);
-                item.setCondition(row.item_condition || 'Like New');
-                
-                if (row.item_tags) {
-                    const tags = JSON.parse(row.item_tags);
-                    tags.forEach(tag => item.addTag(tag));
-                }
-                
-                return item;
-            });
+            return rows.map(row => this.mapRowToItem(row));
         } catch (error) {
             console.error('❌ Error getting available items:', error.message);
             throw error;
         }
     }
 
-    // Get items by owner
     static async getItemsByOwner(ownerId) {
         try {
             await this.initialize();
@@ -280,35 +302,13 @@ class Database {
             );
             
             console.log(`📦 Found ${rows.length} items for owner ID: ${ownerId}`);
-            const Item = require('./Item');
-            return rows.map(row => {
-                const item = new Item(
-                    row.item_id,
-                    row.item_name,
-                    row.owner_id,
-                    row.renter_id,
-                    row.item_image_url
-                );
-                item.isRenting = row.is_renting;
-                item.isRented = row.is_rented;
-                item.setDescription(row.item_description || '');
-                item.setPrice(row.item_price || 0);
-                item.setCondition(row.item_condition || 'Like New');
-                
-                if (row.item_tags) {
-                    const tags = JSON.parse(row.item_tags);
-                    tags.forEach(tag => item.addTag(tag));
-                }
-                
-                return item;
-            });
+            return rows.map(row => this.mapRowToItem(row));
         } catch (error) {
             console.error('❌ Error getting items by owner:', error.message);
             throw error;
         }
     }
 
-    // Get items by renter
     static async getItemsByRenter(renterId) {
         try {
             await this.initialize();
@@ -318,35 +318,13 @@ class Database {
             );
             
             console.log(`📦 Found ${rows.length} items for renter ID: ${renterId}`);
-            const Item = require('./Item');
-            return rows.map(row => {
-                const item = new Item(
-                    row.item_id,
-                    row.item_name,
-                    row.owner_id,
-                    row.renter_id,
-                    row.item_image_url
-                );
-                item.isRenting = row.is_renting;
-                item.isRented = row.is_rented;
-                item.setDescription(row.item_description || '');
-                item.setPrice(row.item_price || 0);
-                item.setCondition(row.item_condition || 'Like New');
-                
-                if (row.item_tags) {
-                    const tags = JSON.parse(row.item_tags);
-                    tags.forEach(tag => item.addTag(tag));
-                }
-                
-                return item;
-            });
+            return rows.map(row => this.mapRowToItem(row));
         } catch (error) {
             console.error('❌ Error getting items by renter:', error.message);
             throw error;
         }
     }
 
-    // Get items by single tag/category
     static async getItemsByTag(tag) {
         try {
             await this.initialize();
@@ -356,70 +334,9 @@ class Database {
             );
             
             console.log(`🏷️ Found ${rows.length} items with tag: ${tag}`);
-            const Item = require('./Item');
-            return rows.map(row => {
-                const item = new Item(
-                    row.item_id,
-                    row.item_name,
-                    row.owner_id,
-                    row.renter_id,
-                    row.item_image_url
-                );
-                item.isRenting = row.is_renting;
-                item.isRented = row.is_rented;
-                item.setDescription(row.item_description || '');
-                item.setPrice(row.item_price || 0);
-                item.setCondition(row.item_condition || 'Like New');
-                
-                if (row.item_tags) {
-                    const tags = JSON.parse(row.item_tags);
-                    tags.forEach(tag => item.addTag(tag));
-                }
-                
-                return item;
-            });
+            return rows.map(row => this.mapRowToItem(row));
         } catch (error) {
             console.error('❌ Error getting items by tag:', error.message);
-            throw error;
-        }
-    }
-
-    // Get items by multiple tags
-    static async getItemsByTags(tags) {
-        try {
-            await this.initialize();
-            
-            const conditions = tags.map(() => 'JSON_CONTAINS(item_tags, ?)').join(' OR ');
-            const query = `SELECT * FROM items WHERE (${conditions}) AND is_renting = TRUE AND is_rented = FALSE`;
-            const params = tags.map(tag => JSON.stringify(tag));
-            
-            const [rows] = await this.pool.execute(query, params);
-            
-            console.log(`🏷️ Found ${rows.length} items with tags: ${tags.join(', ')}`);
-            const Item = require('./Item');
-            return rows.map(row => {
-                const item = new Item(
-                    row.item_id,
-                    row.item_name,
-                    row.owner_id,
-                    row.renter_id,
-                    row.item_image_url
-                );
-                item.isRenting = row.is_renting;
-                item.isRented = row.is_rented;
-                item.setDescription(row.item_description || '');
-                item.setPrice(row.item_price || 0);
-                item.setCondition(row.item_condition || 'Like New');
-                
-                if (row.item_tags) {
-                    const tags = JSON.parse(row.item_tags);
-                    tags.forEach(tag => item.addTag(tag));
-                }
-                
-                return item;
-            });
-        } catch (error) {
-            console.error('❌ Error getting items by tags:', error.message);
             throw error;
         }
     }
@@ -441,7 +358,11 @@ class Database {
                     item_tags = ?,
                     item_rating = ?,
                     rating_count = ?,
-                    total_rating_points = ?
+                    total_rating_points = ?,
+                    rental_duration = ?,
+                    rental_duration_unit = ?,
+                    min_rental_duration = ?,
+                    max_rental_duration = ?
                 WHERE item_id = ?`,
                 [
                     item.getItemName(),
@@ -457,6 +378,10 @@ class Database {
                     item.itemRating,
                     item.ratingCount,
                     item.totalRatingPoints,
+                    item.getRentalDuration(),
+                    item.getRentalDurationUnit(),
+                    item.getMinRentalDuration(),
+                    item.getMaxRentalDuration(),
                     item.getItemId()
                 ]
             );

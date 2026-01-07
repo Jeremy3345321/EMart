@@ -251,7 +251,6 @@ function createReceiptCard(receipt, type) {
             <div class="receipt-header">
                 <div class="receipt-info">
                     <h3>${receipt.itemName}</h3>
-                    <span class="receipt-id">Receipt #${receipt.receiptId}</span>
                 </div>
                 <span class="receipt-status ${statusClass}">${statusText}</span>
             </div>
@@ -296,12 +295,297 @@ function createReceiptCard(receipt, type) {
     `;
 }
 
-// View item details
-function viewItem(itemId) {
-    console.log('🔗 Navigating to item:', itemId);
-    // Store item ID and redirect to dashboard
-    sessionStorage.setItem('viewItemId', itemId);
-    window.location.href = 'dashboard.html';
+// Add this to receipts.js (replace the existing viewItem function)
+
+// Modal elements
+const modal = document.getElementById('itemReceiptModal');
+const modalLoading = document.getElementById('modalLoading');
+const modalContent = document.getElementById('modalContent');
+const closeModalBtn = document.getElementById('closeModal');
+const closeModalBtnFooter = document.getElementById('closeModalBtn');
+const viewFullItemBtn = document.getElementById('viewFullItem');
+
+let currentItemId = null;
+let currentReceiptData = null;
+
+// Close modal when clicking close button
+closeModalBtn.addEventListener('click', closeModal);
+closeModalBtnFooter.addEventListener('click', closeModal);
+
+// Close modal when clicking outside
+modal.addEventListener('click', function(e) {
+    if (e.target === modal) {
+        closeModal();
+    }
+});
+
+// Close modal with Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modal.classList.contains('active')) {
+        closeModal();
+    }
+});
+
+// View full item on dashboard
+viewFullItemBtn.addEventListener('click', function() {
+    if (currentItemId) {
+        sessionStorage.setItem('viewItemId', currentItemId);
+        window.location.href = 'dashboard.html';
+    }
+});
+
+// View item details - Updated function
+async function viewItem(itemId, receipt = null) {
+    console.log('🔍 Opening modal for item:', itemId);
+    currentItemId = itemId;
+    
+    // Find receipt data from the displayed receipts
+    if (!receipt) {
+        // Try to find receipt in current tab
+        const activeTab = document.querySelector('.tab-btn.active').dataset.tab;
+        const receiptCard = event.target.closest('.receipt-card');
+        
+        // Extract receipt data from the card
+        receipt = extractReceiptDataFromCard(receiptCard);
+    }
+    
+    currentReceiptData = receipt;
+    
+    // Show modal
+    modal.classList.add('active');
+    modalLoading.style.display = 'flex';
+    modalContent.style.display = 'none';
+    document.body.style.overflow = 'hidden';
+    
+    try {
+        // Fetch item details
+        const itemResponse = await fetch(`${API_URL}/items/${itemId}`);
+        const itemData = await itemResponse.json();
+        
+        if (!itemData.success) {
+            throw new Error('Failed to load item details');
+        }
+        
+        // Populate modal with data
+        populateModal(itemData.data, receipt);
+        
+        // Show content
+        modalLoading.style.display = 'none';
+        modalContent.style.display = 'block';
+        
+    } catch (error) {
+        console.error('❌ Error loading item details:', error);
+        modalLoading.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 40px; height: 40px; color: #e74c3c;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+            <p class="modal-loading-text" style="color: #e74c3c;">Failed to load item details</p>
+        `;
+    }
+}
+
+// Extract receipt data from card HTML
+function extractReceiptDataFromCard(card) {
+    if (!card) return null;
+    
+    const fields = card.querySelectorAll('.receipt-field');
+    const receipt = {
+        itemName: card.querySelector('h3').textContent,
+        status: card.querySelector('.receipt-status').textContent.toLowerCase(),
+        rentalPrice: 0,
+        rentalStartDate: '',
+        rentalEndDate: '',
+        createdAt: card.querySelector('.receipt-date').textContent.replace('Created: ', '')
+    };
+    
+    fields.forEach(field => {
+        const label = field.querySelector('.field-label').textContent;
+        const value = field.querySelector('.field-value').textContent;
+        
+        if (label.includes('Price')) {
+            receipt.rentalPrice = parseFloat(value.replace('₱', '').replace(',', ''));
+        } else if (label.includes('Start Date')) {
+            receipt.rentalStartDate = value;
+        } else if (label.includes('End Date')) {
+            receipt.rentalEndDate = value;
+        } else if (label.includes('Rental Period')) {
+            receipt.rentalDuration = value;
+        } else if (label.includes('Renter ID')) {
+            receipt.renterId = value.replace('#', '');
+        } else if (label.includes('Owner ID')) {
+            receipt.ownerId = value.replace('#', '');
+        }
+    });
+    
+    return receipt;
+}
+
+// Populate modal with item and receipt data
+function populateModal(item, receipt) {
+    // Item Information
+    const itemImage = document.getElementById('modalItemImage');
+    itemImage.src = item.imageUrl || 'images/placeholder.png';
+    itemImage.alt = item.itemName;
+    
+    document.getElementById('modalItemName').textContent = item.itemName;
+    document.getElementById('modalItemDescription').textContent = item.description || 'No description available';
+    document.getElementById('modalItemPrice').textContent = `₱${parseFloat(item.price).toFixed(2)}`;
+    document.getElementById('modalItemDuration').textContent = item.formattedDuration || `${item.rentalDuration} ${item.rentalDurationUnit}(s)`;
+    document.getElementById('modalItemCondition').textContent = item.condition;
+    
+    // Rating
+    const ratingElement = document.getElementById('modalItemRating');
+    if (item.rating && item.rating > 0) {
+        ratingElement.innerHTML = `
+            <span style="color: #f39c12;">★</span> ${item.rating.toFixed(1)} (${item.ratingCount} reviews)
+        `;
+    } else {
+        ratingElement.textContent = 'No ratings yet';
+    }
+    
+    document.getElementById('modalItemOwner').textContent = `#${item.ownerId}`;
+    
+    // Tags
+    const tagsContainer = document.getElementById('modalItemTags');
+    if (item.tags && item.tags.length > 0) {
+        tagsContainer.innerHTML = item.tags.map(tag => 
+            `<span class="modal-tag">${tag}</span>`
+        ).join('');
+    } else {
+        tagsContainer.innerHTML = '';
+    }
+    
+    // Receipt Information
+    if (receipt) {
+        document.getElementById('modalReceiptId').textContent = `#${receipt.receiptId || 'N/A'}`;
+        document.getElementById('modalReceiptPrice').textContent = `₱${parseFloat(receipt.rentalPrice || 0).toFixed(2)}`;
+        document.getElementById('modalReceiptStart').textContent = formatDate(receipt.rentalStartDate);
+        document.getElementById('modalReceiptEnd').textContent = formatDate(receipt.rentalEndDate);
+        document.getElementById('modalReceiptDuration').textContent = receipt.rentalDuration || calculateDuration(receipt.rentalStartDate, receipt.rentalEndDate);
+        document.getElementById('modalReceiptCreated').textContent = formatDate(receipt.createdAt);
+        
+        // Status
+        const statusElement = document.getElementById('modalReceiptStatus');
+        const status = receipt.status || 'active';
+        statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        statusElement.className = `modal-status-badge status-${status}`;
+    }
+}
+
+// Helper function to format dates
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+    });
+}
+
+// Helper function to calculate duration
+function calculateDuration(startDate, endDate) {
+    if (!startDate || !endDate) return 'N/A';
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    return `${days} day${days !== 1 ? 's' : ''}`;
+}
+
+// Close modal function
+function closeModal() {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    currentItemId = null;
+    currentReceiptData = null;
+}
+
+// Update the createReceiptCard function to pass receipt data
+function createReceiptCard(receipt, type) {
+    const statusClass = `status-${receipt.status}`;
+    const statusText = receipt.status.charAt(0).toUpperCase() + receipt.status.slice(1);
+    
+    // Format dates
+    const startDate = new Date(receipt.rentalStartDate).toLocaleDateString();
+    const endDate = new Date(receipt.rentalEndDate).toLocaleDateString();
+    const createdDate = new Date(receipt.createdAt).toLocaleDateString();
+    
+    // Calculate rental duration
+    const start = new Date(receipt.rentalStartDate);
+    const end = new Date(receipt.rentalEndDate);
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    
+    // Store receipt data as JSON in data attribute
+    const receiptJson = JSON.stringify({
+        receiptId: receipt.receiptId,
+        itemId: receipt.itemId,
+        itemName: receipt.itemName,
+        ownerId: receipt.ownerId,
+        renterId: receipt.renterId,
+        rentalStartDate: receipt.rentalStartDate,
+        rentalEndDate: receipt.rentalEndDate,
+        rentalPrice: receipt.rentalPrice,
+        status: receipt.status,
+        createdAt: receipt.createdAt,
+        rentalDuration: `${days} day${days !== 1 ? 's' : ''}`
+    });
+    
+    return `
+        <div class="receipt-card" data-receipt='${receiptJson.replace(/'/g, "&apos;")}'>
+            <div class="receipt-header">
+                <div class="receipt-info">
+                    <h3>${receipt.itemName}</h3>
+                </div>
+                <span class="receipt-status ${statusClass}">${statusText}</span>
+            </div>
+            
+            <div class="receipt-body">
+                <div class="receipt-field">
+                    <span class="field-label">Rental Period</span>
+                    <span class="field-value">${days} day${days !== 1 ? 's' : ''}</span>
+                </div>
+                <div class="receipt-field">
+                    <span class="field-label">Start Date</span>
+                    <span class="field-value">${startDate}</span>
+                </div>
+                <div class="receipt-field">
+                    <span class="field-label">End Date</span>
+                    <span class="field-value">${endDate}</span>
+                </div>
+                <div class="receipt-field">
+                    <span class="field-label">Price</span>
+                    <span class="field-value receipt-price">₱${parseFloat(receipt.rentalPrice).toFixed(2)}</span>
+                </div>
+                ${type === 'rented' ? `
+                <div class="receipt-field">
+                    <span class="field-label">Renter ID</span>
+                    <span class="field-value">#${receipt.renterId}</span>
+                </div>
+                ` : `
+                <div class="receipt-field">
+                    <span class="field-label">Owner ID</span>
+                    <span class="field-value">#${receipt.ownerId}</span>
+                </div>
+                `}
+            </div>
+            
+            <div class="receipt-footer">
+                <span class="receipt-date">Created: ${createdDate}</span>
+                <div class="receipt-actions">
+                    <button class="btn-view-item" onclick="viewItemFromCard(this)">View Item</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// New function to handle view item from card
+function viewItemFromCard(button) {
+    const card = button.closest('.receipt-card');
+    const receiptData = JSON.parse(card.dataset.receipt);
+    viewItem(receiptData.itemId, receiptData);
 }
 
 // Initialize page

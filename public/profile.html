@@ -23,7 +23,6 @@
         </div>
 
         <div class="header-icons">
-            <!-- Notification Button with Dropdown -->
             <div class="dropdown" style="position: relative;">
                 <button class="icon-btn" id="notificationBtn" title="Notifications">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -32,7 +31,6 @@
                     </svg>
                 </button>
                 
-                <!-- Notification Dropdown -->
                 <div class="notification-dropdown" id="notificationDropdown">
                     <div class="notification-header">
                         <h3>Notifications</h3>
@@ -50,7 +48,6 @@
                 </div>
             </div>
             
-            <!-- Cart Button -->
             <button class="icon-btn" id="cartBtn" title="Cart">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="9" cy="21" r="1"></circle>
@@ -59,7 +56,6 @@
                 </svg>
             </button>
             
-            <!-- Menu Dropdown -->
             <div class="dropdown">
                 <button class="icon-btn" id="menuBtn" title="Menu">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -123,34 +119,118 @@
     <!-- DASHBOARD STATS -->
     <section class="stats-section">
         <div class="stat-card">
-            <h3>Total Items</h3>
-            <p class="stat-number" id="totalItems">0</p>
+            <h3>Items I Own</h3>
+            <p class="stat-number" id="totalItemsOwned">0</p>
         </div>
         <div class="stat-card">
             <h3>Items Available</h3>
             <p class="stat-number" id="availableItems">0</p>
         </div>
         <div class="stat-card">
-            <h3>Items Rented Out</h3>
+            <h3>Items Being Rented Out</h3>
             <p class="stat-number" id="rentedOutItems">0</p>
+        </div>
+        <div class="stat-card">
+            <h3>Items I'm Renting</h3>
+            <p class="stat-number" id="itemsRenting">0</p>
         </div>
     </section>
 
-    <!-- ITEMS SECTION -->
+    <!-- ITEMS OWNED SECTION -->
     <section class="items-section">
         <div class="section-header">
-            <h2>Your Items</h2>
+            <h2>Items I Own</h2>
             <button class="add-item-btn" id="addItemBtn">+ Add Item</button>
         </div>
 
-        <div class="items-grid" id="itemsGrid">
+        <div class="items-grid" id="ownedItemsGrid">
             <div class="item-card add-card" id="addItemCard">
                 <span class="plus">+</span>
                 <p>Add New Item</p>
             </div>
-            <!-- User items will be loaded here -->
         </div>
     </section>
+
+    <!-- ITEMS RENTING SECTION -->
+    <section class="items-section">
+        <div class="section-header">
+            <h2>Items I'm Currently Renting</h2>
+        </div>
+
+        <div class="items-grid" id="rentingItemsGrid">
+            <p class="loading-text">Loading...</p>
+        </div>
+    </section>
+
+    <!-- Item Management Modal -->
+    <div class="modal" id="itemModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Manage Item</h2>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            
+            <div class="modal-body" id="modalBody">
+                <form id="itemForm">
+                    <div class="form-group">
+                        <label>Item Name</label>
+                        <input type="text" id="editItemName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="editDescription" rows="4" required></textarea>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Rental Duration</label>
+                            <input type="number" id="editRentalDuration" min="1" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Duration Unit</label>
+                            <select id="editDurationUnit" required>
+                                <option value="hour">Hour(s)</option>
+                                <option value="day">Day(s)</option>
+                                <option value="week">Week(s)</option>
+                                <option value="month">Month(s)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Price (₱)</label>
+                        <input type="number" id="editPrice" min="0" step="0.01" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Condition</label>
+                        <select id="editCondition" required>
+                            <option value="Like New">Like New</option>
+                            <option value="Excellent">Excellent</option>
+                            <option value="Very Good">Very Good</option>
+                            <option value="Good">Good</option>
+                            <option value="Fair">Fair</option>
+                        </select>
+                    </div>
+
+                    <div class="rental-status" id="rentalStatusInfo" style="display: none;">
+                        <div class="status-badge status-rented">Currently Rented</div>
+                        <p class="status-note">Item details cannot be edited while being rented</p>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btnSeeReceipts">See Receipts</button>
+                <div class="modal-actions">
+                    <button class="btn-cancel" id="btnCancel">Cancel</button>
+                    <button class="btn-save" id="btnSaveItem">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="scripts/notification-manager.js"></script>
     <script src="scripts/profile.js"></script>

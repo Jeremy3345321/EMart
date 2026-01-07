@@ -23,7 +23,6 @@
         </div>
 
         <div class="header-icons">
-            <!-- Notification Button with Dropdown -->
             <div class="dropdown" style="position: relative;">
                 <button class="icon-btn" id="notificationBtn" title="Notifications">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -32,7 +31,6 @@
                     </svg>
                 </button>
                 
-                <!-- Notification Dropdown -->
                 <div class="notification-dropdown" id="notificationDropdown">
                     <div class="notification-header">
                         <h3>Notifications</h3>
@@ -50,7 +48,6 @@
                 </div>
             </div>
             
-            <!-- Cart Button -->
             <button class="icon-btn" id="cartBtn" title="Cart">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="9" cy="21" r="1"></circle>
@@ -59,7 +56,6 @@
                 </svg>
             </button>
             
-            <!-- Menu Dropdown -->
             <div class="dropdown">
                 <button class="icon-btn" id="menuBtn" title="Menu">
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -129,9 +125,47 @@
                 <textarea id="description" name="description" required rows="5" maxlength="500"></textarea>
             </div>
 
-            <div class="form-group">
-                <label for="price">Rental Price (₱) *</label>
-                <input type="number" id="price" name="price" required min="0" step="0.01">
+            <!-- NEW: Rental Duration Section -->
+            <div class="form-section">
+                <h3 class="section-subtitle">Rental Duration & Pricing</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="rentalDuration">Base Rental Duration *</label>
+                        <input type="number" id="rentalDuration" name="rentalDuration" required min="1" value="1">
+                        <small>How long is this rental period for?</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="durationUnit">Duration Unit *</label>
+                        <select id="durationUnit" name="durationUnit" required>
+                            <option value="hour">Hour(s)</option>
+                            <option value="day" selected>Day(s)</option>
+                            <option value="week">Week(s)</option>
+                            <option value="month">Month(s)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="price">Rental Price (₱) *</label>
+                    <input type="number" id="price" name="price" required min="0" step="0.01">
+                    <small id="priceHelper">Price for <span id="durationDisplay">1 day</span></small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="minDuration">Minimum Rental Duration (Optional)</label>
+                        <input type="number" id="minDuration" name="minDuration" min="1">
+                        <small>Leave empty for no minimum</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="maxDuration">Maximum Rental Duration (Optional)</label>
+                        <input type="number" id="maxDuration" name="maxDuration" min="1">
+                        <small>Leave empty for no maximum</small>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
