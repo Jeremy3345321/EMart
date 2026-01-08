@@ -9,9 +9,9 @@ class Receipt {
         this.rentalStartDate = null;
         this.rentalEndDate = null;
         this.rentalPrice = 0;
-        this.status = 'active'; // active, completed, cancelled
+        this.status = 'active'; // Default status
         this.createdAt = null;
-        this.updatedAt = null;
+        this.updatedAt = null; // ADDED: Track when status changes
     }
 
     // Getters
@@ -85,9 +85,10 @@ class Receipt {
     }
 
     setStatus(status) {
-        const validStatuses = ['active', 'completed', 'cancelled'];
+        const validStatuses = ['pending_payment', 'active', 'completed', 'cancelled', 'returned_early'];
         if (validStatuses.includes(status)) {
             this.status = status;
+            this.updatedAt = new Date(); // Update timestamp when status changes
         } else {
             throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
         }
@@ -115,6 +116,14 @@ class Receipt {
 
     isCancelled() {
         return this.status === 'cancelled';
+    }
+
+    isReturnedEarly() {
+        return this.status === 'returned_early';
+    }
+
+    isPendingPayment() {
+        return this.status === 'pending_payment';
     }
 
     isOverdue() {

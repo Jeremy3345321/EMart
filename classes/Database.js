@@ -392,143 +392,6 @@ class Database {
         }
     }
 
-    // ==================== RATING METHODS ====================
-
-    // Add rating to an item
-    static async addItemRating(itemId, renterId, rating) {
-        try {
-            await this.initialize();
-            
-            // Validate rating
-            if (rating < 0 || rating > 5) {
-                throw new Error('Rating must be between 0 and 5');
-            }
-            
-            // Check if item exists
-            const item = await this.getItemById(itemId);
-            if (!item) {
-                throw new Error('Item not found');
-            }
-            
-            // Check if user has rented this item (completed rental)
-            const [receipts] = await this.pool.execute(
-                `SELECT r.* FROM receipts r 
-                JOIN items i ON r.item_id = i.item_id 
-                WHERE r.item_id = ? 
-                AND r.renter_id = ? 
-                AND r.status = 'completed'
-                AND i.is_rented = TRUE`,
-                [itemId, renterId]
-            );
-            
-            if (receipts.length === 0) {
-                throw new Error('You can only rate items you have rented and received');
-            }
-            
-            // Check if user already rated this item
-            const [existingRatings] = await this.pool.execute(
-                'SELECT * FROM item_ratings WHERE item_id = ? AND renter_id = ?',
-                [itemId, renterId]
-            );
-            
-            if (existingRatings.length > 0) {
-                // Update existing rating
-                const oldRating = existingRatings[0].rating;
-                await this.pool.execute(
-                    'UPDATE item_ratings SET rating = ?, rated_at = CURRENT_TIMESTAMP WHERE item_id = ? AND renter_id = ?',
-                    [rating, itemId, renterId]
-                );
-                
-                // Update item's rating statistics
-                const newTotalPoints = item.totalRatingPoints - oldRating + rating;
-                const newAvgRating = (newTotalPoints / item.ratingCount).toFixed(1);
-                
-                await this.pool.execute(
-                    'UPDATE items SET item_rating = ?, total_rating_points = ? WHERE item_id = ?',
-                    [newAvgRating, newTotalPoints, itemId]
-                );
-                
-                console.log(`✅ Rating updated for item ${itemId}: ${oldRating} -> ${rating}`);
-            } else {
-                // Add new rating
-                await this.pool.execute(
-                    'INSERT INTO item_ratings (item_id, renter_id, rating) VALUES (?, ?, ?)',
-                    [itemId, renterId, rating]
-                );
-                
-                // Update item's rating statistics
-                const newTotalPoints = item.totalRatingPoints + rating;
-                const newCount = item.ratingCount + 1;
-                const newAvgRating = (newTotalPoints / newCount).toFixed(1);
-                
-                await this.pool.execute(
-                    'UPDATE items SET item_rating = ?, rating_count = ?, total_rating_points = ? WHERE item_id = ?',
-                    [newAvgRating, newCount, newTotalPoints, itemId]
-                );
-                
-                console.log(`✅ New rating added for item ${itemId}: ${rating} (Avg: ${newAvgRating})`);
-            }
-            
-            return true;
-        } catch (error) {
-            console.error('❌ Error adding rating:', error.message);
-            throw error;
-        }
-    }
-
-    // Get user's rating for an item
-    static async getUserRatingForItem(itemId, renterId) {
-        try {
-            await this.initialize();
-            const [rows] = await this.pool.execute(
-                'SELECT * FROM item_ratings WHERE item_id = ? AND renter_id = ?',
-                [itemId, renterId]
-            );
-            
-            return rows.length > 0 ? rows[0] : null;
-        } catch (error) {
-            console.error('❌ Error getting user rating:', error.message);
-            return null;
-        }
-    }
-
-    // Check if user can rate an item (has rented and received it)
-    static async canUserRateItem(itemId, renterId) {
-        try {
-            await this.initialize();
-            const [receipts] = await this.pool.execute(
-                `SELECT r.* FROM receipts r 
-                JOIN items i ON r.item_id = i.item_id 
-                WHERE r.item_id = ? 
-                AND r.renter_id = ? 
-                AND r.status = 'completed'
-                AND i.is_rented = TRUE`,
-                [itemId, renterId]
-            );
-            
-            return receipts.length > 0;
-        } catch (error) {
-            console.error('❌ Error checking rating permission:', error.message);
-            return false;
-        }
-    }
-
-    // Update item to mark as arrived (sets is_rented to true)
-    static async markItemAsArrived(itemId) {
-        try {
-            await this.initialize();
-            await this.pool.execute(
-                'UPDATE items SET is_rented = TRUE WHERE item_id = ?',
-                [itemId]
-            );
-            console.log(`✅ Item ${itemId} marked as arrived (is_rented = TRUE)`);
-            return true;
-        } catch (error) {
-            console.error('❌ Error marking item as arrived:', error.message);
-            throw error;
-        }
-    }
-
     // ==================== RECEIPT METHODS ====================
 
     static async addReceipt(receipt) {
@@ -562,8 +425,8 @@ class Database {
             
             console.log(`   ✅ Receipt inserted into database`);
             console.log(`      Receipt ID: ${result.insertId}`);
+            console.log(`      Status: ${receipt.status || 'active'}`);
             console.log(`      DB insert time: ${dbTime.toFixed(3)} seconds`);
-            console.log(`      Completed at: ${completedTime.toISOString()}`);
             
             return receipt;
         } catch (error) {
@@ -571,6 +434,7 @@ class Database {
             throw error;
         }
     }
+
     static async getReceiptById(receiptId) {
         try {
             await this.initialize();
@@ -589,10 +453,11 @@ class Database {
                 receipt.rentalStartDate = rows[0].rental_start_date;
                 receipt.rentalEndDate = rows[0].rental_end_date;
                 receipt.rentalPrice = rows[0].rental_price;
-                receipt.status = rows[0].status;
+                receipt.status = rows[0].status || 'active'; // Default to 'active' if empty
                 receipt.createdAt = rows[0].created_at;
+                receipt.updatedAt = rows[0].updated_at; // ADDED: Include updatedAt
                 
-                console.log(`✅ Receipt found: ${receipt.receiptId}`);
+                console.log(`✅ Receipt found: ${receipt.receiptId} (Status: ${receipt.status})`);
                 return receipt;
             }
             console.log(`⚠️ Receipt not found with ID: ${receiptId}`);
@@ -603,22 +468,35 @@ class Database {
         }
     }
 
+    // FIXED: Single consolidated updateReceiptStatus method with proper validation
     static async updateReceiptStatus(receiptId, status) {
         try {
             await this.initialize();
             
-            // Valid statuses including returned_early
+            // IMPORTANT: Validate status before updating
             const validStatuses = ['pending_payment', 'active', 'completed', 'cancelled', 'returned_early'];
             
-            if (!validStatuses.includes(status)) {
-                throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+            if (!status || status.trim() === '') {
+                throw new Error('Status cannot be empty');
             }
             
-            await this.pool.execute(
+            if (!validStatuses.includes(status)) {
+                throw new Error(`Invalid status: "${status}". Must be one of: ${validStatuses.join(', ')}`);
+            }
+            
+            console.log(`📝 Updating receipt ${receiptId}: status -> "${status}"`);
+            
+            const [result] = await this.pool.execute(
                 'UPDATE receipts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE receipt_id = ?',
                 [status, receiptId]
             );
-            console.log(`✅ Receipt status updated: ${receiptId} -> ${status}`);
+            
+            if (result.affectedRows === 0) {
+                console.warn(`⚠️ No rows affected - Receipt ${receiptId} may not exist`);
+                return false;
+            }
+            
+            console.log(`✅ Receipt status updated: ${receiptId} -> "${status}" (${result.affectedRows} row(s) affected)`);
             return true;
         } catch (error) {
             console.error('❌ Error updating receipt status:', error.message);
@@ -645,8 +523,9 @@ class Database {
                 receipt.rentalStartDate = row.rental_start_date;
                 receipt.rentalEndDate = row.rental_end_date;
                 receipt.rentalPrice = row.rental_price;
-                receipt.status = row.status;
+                receipt.status = row.status || 'active'; // Default to 'active' if empty
                 receipt.createdAt = row.created_at;
+                receipt.updatedAt = row.updated_at; // ADDED: Include updatedAt
                 return receipt;
             });
         } catch (error) {
@@ -674,8 +553,9 @@ class Database {
                 receipt.rentalStartDate = row.rental_start_date;
                 receipt.rentalEndDate = row.rental_end_date;
                 receipt.rentalPrice = row.rental_price;
-                receipt.status = row.status;
+                receipt.status = row.status || 'active'; // Default to 'active' if empty
                 receipt.createdAt = row.created_at;
+                receipt.updatedAt = row.updated_at; // ADDED: Include updatedAt
                 return receipt;
             });
         } catch (error) {
@@ -703,27 +583,14 @@ class Database {
                 receipt.rentalStartDate = row.rental_start_date;
                 receipt.rentalEndDate = row.rental_end_date;
                 receipt.rentalPrice = row.rental_price;
-                receipt.status = row.status;
+                receipt.status = row.status || 'active'; // Default to 'active' if empty
                 receipt.createdAt = row.created_at;
+                receipt.updatedAt = row.updated_at; // ADDED: Include updatedAt
                 return receipt;
             });
         } catch (error) {
             console.error('❌ Error getting receipts by item:', error.message);
             return [];
-        }
-    }
-
-    static async updateReceiptStatus(receiptId, status) {
-        try {
-            await this.initialize();
-            await this.pool.execute(
-                'UPDATE receipts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE receipt_id = ?',
-                [status, receiptId]
-            );
-            console.log(`✅ Receipt status updated: ${receiptId} -> ${status}`);
-        } catch (error) {
-            console.error('❌ Error updating receipt status:', error.message);
-            throw error;
         }
     }
 
@@ -759,6 +626,7 @@ class Database {
                 receipt.rentalPrice = row.rental_price;
                 receipt.status = row.status;
                 receipt.createdAt = row.created_at;
+                receipt.updatedAt = row.updated_at;
                 return receipt;
             });
         } catch (error) {
@@ -788,68 +656,11 @@ class Database {
                 receipt.rentalPrice = row.rental_price;
                 receipt.status = row.status;
                 receipt.createdAt = row.created_at;
+                receipt.updatedAt = row.updated_at;
                 return receipt;
             });
         } catch (error) {
             console.error('❌ Error getting overdue rentals:', error.message);
-            return [];
-        }
-    }
-
-    static async getReceiptsByOwner(ownerId) {
-        try {
-            await this.initialize();
-            const [rows] = await this.pool.execute(
-                'SELECT * FROM receipts WHERE owner_id = ? ORDER BY created_at DESC',
-                [ownerId]
-            );
-            
-            console.log(`📄 Found ${rows.length} receipts for owner ID: ${ownerId}`);
-            const Receipt = require('./Receipt'); 
-            return rows.map(row => {
-                const receipt = new Receipt();
-                receipt.receiptId = row.receipt_id;
-                receipt.itemId = row.item_id;
-                receipt.ownerId = row.owner_id;
-                receipt.renterId = row.renter_id;
-                receipt.rentalStartDate = row.rental_start_date;
-                receipt.rentalEndDate = row.rental_end_date;
-                receipt.rentalPrice = row.rental_price;
-                receipt.status = row.status;
-                receipt.createdAt = row.created_at;
-                return receipt;
-            });
-        } catch (error) {
-            console.error('❌ Error getting receipts by owner:', error.message);
-            return [];
-        }
-    }
-
-    static async getReceiptsByRenter(renterId) {
-        try {
-            await this.initialize();
-            const [rows] = await this.pool.execute(
-                'SELECT * FROM receipts WHERE renter_id = ? ORDER BY created_at DESC',
-                [renterId]
-            );
-            
-            console.log(`📄 Found ${rows.length} receipts for renter ID: ${renterId}`);
-            const Receipt = require('./Receipt');  
-            return rows.map(row => {
-                const receipt = new Receipt();
-                receipt.receiptId = row.receipt_id;
-                receipt.itemId = row.item_id;
-                receipt.ownerId = row.owner_id;
-                receipt.renterId = row.renter_id;
-                receipt.rentalStartDate = row.rental_start_date;
-                receipt.rentalEndDate = row.rental_end_date;
-                receipt.rentalPrice = row.rental_price;
-                receipt.status = row.status;
-                receipt.createdAt = row.created_at;
-                return receipt;
-            });
-        } catch (error) {
-            console.error('❌ Error getting receipts by renter:', error.message);
             return [];
         }
     }

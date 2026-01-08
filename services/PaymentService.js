@@ -204,8 +204,7 @@ class PaymentService {
             await Database.pool.execute(
                 `UPDATE receipts 
                 SET total_refunded = ?, 
-                    refund_transaction_id = ?,
-                    status = 'recalled'
+                    refund_transaction_id = ?
                 WHERE receipt_id = ?`,
                 [refundAmount, refundResult.insertId, receiptId]
             );

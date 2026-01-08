@@ -581,6 +581,468 @@ function createReceiptCard(receipt, type) {
     `;
 }
 
+
+function createReceiptCard(receipt, type) {
+    // Normalize the status to ensure compatibility
+    const normalizedStatus = normalizeReceiptStatus(receipt.status);
+    
+    // Use normalized status for everything
+    let statusClass = `status-${normalizedStatus.replace(/_/g, '-')}`;
+    let statusText = formatStatusText(normalizedStatus);
+    
+    // Format dates
+    const startDate = new Date(receipt.rentalStartDate).toLocaleDateString();
+    const endDate = new Date(receipt.rentalEndDate).toLocaleDateString();
+    const createdDate = new Date(receipt.createdAt).toLocaleDateString();
+    
+    // Calculate rental duration
+    const start = new Date(receipt.rentalStartDate);
+    const end = new Date(receipt.rentalEndDate);
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+    
+    // Calculate actual rental days for returned_early status
+    let actualDays = days;
+    let returnedEarlyInfo = '';
+    
+    if (normalizedStatus === 'returned_early') {
+        const now = new Date();
+        const returnDate = receipt.updatedAt ? new Date(receipt.updatedAt) : now;
+        actualDays = Math.ceil((returnDate - start) / (1000 * 60 * 60 * 24));
+        returnedEarlyInfo = `
+            <div class="receipt-field returned-early-info">
+                <span class="field-label">Returned After</span>
+                <span class="field-value" style="color: #f39c12;">${actualDays} of ${days} day${days !== 1 ? 's' : ''}</span>
+            </div>
+        `;
+    }
+    
+    // Store receipt data with normalized status
+    const receiptJson = JSON.stringify({
+        receiptId: receipt.receiptId,
+        itemId: receipt.itemId,
+        itemName: receipt.itemName,
+        ownerId: receipt.ownerId,
+        renterId: receipt.renterId,
+        rentalStartDate: receipt.rentalStartDate,
+        rentalEndDate: receipt.rentalEndDate,
+        rentalPrice: receipt.rentalPrice,
+        status: normalizedStatus, // Use normalized status
+        createdAt: receipt.createdAt,
+        updatedAt: receipt.updatedAt,
+        rentalDuration: `${days} day${days !== 1 ? 's' : ''}`,
+        actualDuration: normalizedStatus === 'returned_early' ? `${actualDays} day${actualDays !== 1 ? 's' : ''}` : null
+    });
+    
+    return `
+        <div class="receipt-card ${normalizedStatus === 'returned_early' ? 'returned-early-card' : ''}" data-receipt='${receiptJson.replace(/'/g, "&apos;")}'>
+            <div class="receipt-header">
+                <div class="receipt-info">
+                    <h3>${receipt.itemName}</h3>
+                    ${normalizedStatus === 'returned_early' ? '<span class="early-return-badge">📦 Early Return</span>' : ''}
+                </div>
+                <span class="receipt-status ${statusClass}">${statusText}</span>
+            </div>
+            
+            <div class="receipt-body">
+                <div class="receipt-field">
+                    <span class="field-label">Rental Period</span>
+                    <span class="field-value">${days} day${days !== 1 ? 's' : ''}</span>
+                </div>
+                ${returnedEarlyInfo}
+                <div class="receipt-field">
+                    <span class="field-label">Start Date</span>
+                    <span class="field-value">${startDate}</span>
+                </div>
+                <div class="receipt-field">
+                    <span class="field-label">End Date</span>
+                    <span class="field-value">${endDate}</span>
+                </div>
+                <div class="receipt-field">
+                    <span class="field-label">Price</span>
+                    <span class="field-value receipt-price">₱${parseFloat(receipt.rentalPrice).toFixed(2)}</span>
+                </div>
+                ${type === 'rented' ? `
+                <div class="receipt-field">
+                    <span class="field-label">Renter ID</span>
+                    <span class="field-value">#${receipt.renterId}</span>
+                </div>
+                ` : `
+                <div class="receipt-field">
+                    <span class="field-label">Owner ID</span>
+                    <span class="field-value">#${receipt.ownerId}</span>
+                </div>
+                `}
+            </div>
+            
+            <div class="receipt-footer">
+                <span class="receipt-date">Created: ${createdDate}</span>
+                <div class="receipt-actions">
+                    <button class="btn-view-item" onclick="viewItemFromCard(this)">View Item</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Helper function to format status text
+function formatStatusText(status) {
+    const statusMap = {
+        'pending_payment': 'Pending Payment',
+        'active': 'Active',
+        'completed': 'Completed',
+        'cancelled': 'Cancelled',
+        'returned_early': 'Returned Early'
+    };
+    
+    return statusMap[status] || status.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+}
+
+// Update the populateModal function to show returned_early details
+function populateModal(item, receipt) {
+    // Item Information
+    const itemImage = document.getElementById('modalItemImage');
+    itemImage.src = item.imageUrl || 'images/placeholder.png';
+    itemImage.alt = item.itemName;
+    
+    document.getElementById('modalItemName').textContent = item.itemName;
+    document.getElementById('modalItemDescription').textContent = item.description || 'No description available';
+    document.getElementById('modalItemPrice').textContent = `₱${parseFloat(item.price).toFixed(2)}`;
+    document.getElementById('modalItemDuration').textContent = item.formattedDuration || `${item.rentalDuration} ${item.rentalDurationUnit}(s)`;
+    document.getElementById('modalItemCondition').textContent = item.condition;
+    
+    // Rating
+    const ratingElement = document.getElementById('modalItemRating');
+    if (item.rating && item.rating > 0) {
+        ratingElement.innerHTML = `
+            <span style="color: #f39c12;">★</span> ${item.rating.toFixed(1)} (${item.ratingCount} reviews)
+        `;
+    } else {
+        ratingElement.textContent = 'No ratings yet';
+    }
+    
+    document.getElementById('modalItemOwner').textContent = `#${item.ownerId}`;
+    
+    // Tags
+    const tagsContainer = document.getElementById('modalItemTags');
+    if (item.tags && item.tags.length > 0) {
+        tagsContainer.innerHTML = item.tags.map(tag => 
+            `<span class="modal-tag">${tag}</span>`
+        ).join('');
+    } else {
+        tagsContainer.innerHTML = '';
+    }
+    
+    // Receipt Information
+    if (receipt) {
+        document.getElementById('modalReceiptId').textContent = `#${receipt.receiptId || 'N/A'}`;
+        document.getElementById('modalReceiptPrice').textContent = `₱${parseFloat(receipt.rentalPrice || 0).toFixed(2)}`;
+        document.getElementById('modalReceiptStart').textContent = formatDate(receipt.rentalStartDate);
+        document.getElementById('modalReceiptEnd').textContent = formatDate(receipt.rentalEndDate);
+        
+        // Calculate and display duration (with actual duration if returned early)
+        const plannedDuration = calculateDuration(receipt.rentalStartDate, receipt.rentalEndDate);
+        let durationText = plannedDuration;
+        
+        if (receipt.status === 'returned_early' && receipt.actualDuration) {
+            durationText = `${receipt.actualDuration} (planned: ${plannedDuration})`;
+        }
+        
+        document.getElementById('modalReceiptDuration').textContent = durationText;
+        document.getElementById('modalReceiptCreated').textContent = formatDate(receipt.createdAt);
+        
+        // Status with special formatting for returned_early
+        const statusElement = document.getElementById('modalReceiptStatus');
+        const status = receipt.status || 'active';
+        const formattedStatus = formatStatusText(status);
+        
+        statusElement.textContent = formattedStatus;
+        statusElement.className = `modal-status-badge status-${status.replace(/_/g, '-')}`;
+        
+        // Add returned early notice in modal if applicable
+        if (status === 'returned_early') {
+            const modalBody = document.querySelector('#modalContent .modal-receipt-section');
+            
+            // Remove existing notice if any
+            const existingNotice = modalBody.querySelector('.early-return-notice');
+            if (existingNotice) {
+                existingNotice.remove();
+            }
+            
+            // Add new notice
+            const notice = document.createElement('div');
+            notice.className = 'early-return-notice';
+            notice.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div>
+                    <strong>Item Returned Early</strong>
+                    <p>This item was returned before the rental period ended. Refunds may have been processed according to the early return policy.</p>
+                </div>
+            `;
+            modalBody.appendChild(notice);
+        }
+    }
+}
+
+// Add status filter buttons after fetchReceipts function
+function addStatusFilters() {
+    // Get both tab content areas
+    const rentingTab = document.getElementById('rentingTab');
+    const rentedTab = document.getElementById('rentedTab');
+    
+    // Create filter HTML
+    const filterHTML = `
+        <div class="status-filters">
+            <button class="status-filter-btn active" data-status="all">
+                All
+                <span class="filter-count">0</span>
+            </button>
+            <button class="status-filter-btn" data-status="active">
+                Active
+                <span class="filter-count">0</span>
+            </button>
+            <button class="status-filter-btn" data-status="completed">
+                Completed
+                <span class="filter-count">0</span>
+            </button>
+            <button class="status-filter-btn" data-status="returned_early">
+                Returned Early
+                <span class="filter-count">0</span>
+            </button>
+            <button class="status-filter-btn" data-status="cancelled">
+                Cancelled
+                <span class="filter-count">0</span>
+            </button>
+        </div>
+    `;
+    
+    // Insert filters before the grids (after summary card)
+    const rentingSummary = rentingTab.querySelector('.summary-card');
+    const rentedSummary = rentedTab.querySelector('.summary-card');
+    
+    if (rentingSummary && !rentingTab.querySelector('.status-filters')) {
+        rentingSummary.insertAdjacentHTML('afterend', filterHTML);
+    }
+    
+    if (rentedSummary && !rentedTab.querySelector('.status-filters')) {
+        rentedSummary.insertAdjacentHTML('afterend', filterHTML);
+    }
+    
+    // Add event listeners to filter buttons
+    document.querySelectorAll('.status-filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const status = this.dataset.status;
+            const parentTab = this.closest('.tab-content');
+            const isRentingTab = parentTab.id === 'rentingTab';
+            
+            // Update active state
+            parentTab.querySelectorAll('.status-filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Filter receipts
+            filterReceiptsByStatus(status, isRentingTab);
+        });
+    });
+}
+
+function normalizeReceiptStatus(status) {
+    // Map any payment/refund statuses back to receipt statuses
+    const statusMap = {
+        'succeeded': 'returned_early',
+        'pending': 'pending_payment',
+        'failed': 'cancelled'
+    };
+    
+    return statusMap[status] || status;
+}
+
+// Filter receipts by status
+function filterReceiptsByStatus(status, isRentingTab) {
+    const grid = isRentingTab ? rentingGrid : rentedGrid;
+    const allCards = grid.querySelectorAll('.receipt-card');
+    
+    let visibleCount = 0;
+    
+    allCards.forEach(card => {
+        const receiptData = JSON.parse(card.dataset.receipt);
+        
+        if (status === 'all' || receiptData.status === status) {
+            card.style.display = 'block';
+            visibleCount++;
+            // Animate in
+            card.style.animation = 'fadeIn 0.3s ease-out';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Show empty message if no receipts match filter
+    const existingEmpty = grid.querySelector('.filter-empty-message');
+    if (existingEmpty) {
+        existingEmpty.remove();
+    }
+    
+    if (visibleCount === 0 && allCards.length > 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'filter-empty-message';
+        emptyMsg.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 60px; height: 60px; color: #95a5a6;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <h3>No ${formatStatusText(status)} Receipts</h3>
+            <p>Try selecting a different filter</p>
+        `;
+        grid.appendChild(emptyMsg);
+    }
+}
+
+// Update filter counts
+function updateFilterCounts(receipts, isRentingTab) {
+    const parentTab = isRentingTab ? rentingTab : rentedTab;
+    const filterButtons = parentTab.querySelectorAll('.status-filter-btn');
+    
+    // Count receipts by status
+    const counts = {
+        all: receipts.length,
+        active: 0,
+        completed: 0,
+        returned_early: 0,
+        cancelled: 0,
+        pending_payment: 0
+    };
+    
+    receipts.forEach(receipt => {
+        if (counts.hasOwnProperty(receipt.status)) {
+            counts[receipt.status]++;
+        }
+    });
+    
+    // Update button counts
+    filterButtons.forEach(btn => {
+        const status = btn.dataset.status;
+        const countSpan = btn.querySelector('.filter-count');
+        if (countSpan && counts.hasOwnProperty(status)) {
+            countSpan.textContent = counts[status];
+            
+            // Highlight if there are items
+            if (counts[status] > 0) {
+                countSpan.classList.add('has-items');
+            }
+        }
+    });
+}
+
+// Update displayRentingReceipts to include filters
+async function displayRentingReceipts(receipts) {
+    console.log('🎨 Displaying renting receipts:', receipts.length);
+    
+    if (!receipts || receipts.length === 0) {
+        rentingGrid.innerHTML = '<p class="empty-message">You haven\'t rented any items yet</p>';
+        rentingCount.textContent = '0';
+        totalRenting.textContent = '0';
+        totalSpent.textContent = '₱0.00';
+        return;
+    }
+    
+    rentingCount.textContent = receipts.length;
+    totalRenting.textContent = receipts.length;
+    
+    // Calculate total spent
+    const spent = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.rentalPrice || 0), 0);
+    totalSpent.textContent = `₱${spent.toFixed(2)}`;
+    console.log('💰 Total spent:', spent);
+    
+    // Fetch item details for each receipt
+    console.log('🔍 Fetching item details for receipts...');
+    const receiptsWithItems = await Promise.all(
+        receipts.map(async (receipt) => {
+            try {
+                const itemResponse = await fetch(`${API_URL}/items/${receipt.itemId}`);
+                const itemData = await itemResponse.json();
+                const itemName = itemData.success ? itemData.data.itemName : 'Unknown Item';
+                console.log(`✅ Item ${receipt.itemId}: ${itemName}`);
+                return {
+                    ...receipt,
+                    itemName
+                };
+            } catch (error) {
+                console.error(`❌ Error fetching item ${receipt.itemId}:`, error);
+                return {
+                    ...receipt,
+                    itemName: 'Unknown Item'
+                };
+            }
+        })
+    );
+    
+    rentingGrid.innerHTML = receiptsWithItems.map(receipt => createReceiptCard(receipt, 'renting')).join('');
+    
+    // Add filters and update counts
+    addStatusFilters();
+    updateFilterCounts(receiptsWithItems, true);
+    
+    console.log('✅ Renting receipts displayed with filters');
+}
+
+// Update displayRentedReceipts similarly
+async function displayRentedReceipts(receipts) {
+    console.log('🎨 Displaying rented receipts:', receipts.length);
+    
+    if (!receipts || receipts.length === 0) {
+        rentedGrid.innerHTML = '<p class="empty-message">No items are being rented from you</p>';
+        rentedCount.textContent = '0';
+        totalRented.textContent = '0';
+        totalEarnings.textContent = '₱0.00';
+        return;
+    }
+    
+    rentedCount.textContent = receipts.length;
+    totalRented.textContent = receipts.length;
+    
+    // Calculate total earnings
+    const earnings = receipts.reduce((sum, receipt) => sum + parseFloat(receipt.rentalPrice || 0), 0);
+    totalEarnings.textContent = `₱${earnings.toFixed(2)}`;
+    console.log('💰 Total earnings:', earnings);
+    
+    // Fetch item details for each receipt
+    console.log('🔍 Fetching item details for receipts...');
+    const receiptsWithItems = await Promise.all(
+        receipts.map(async (receipt) => {
+            try {
+                const itemResponse = await fetch(`${API_URL}/items/${receipt.itemId}`);
+                const itemData = await itemResponse.json();
+                const itemName = itemData.success ? itemData.data.itemName : 'Unknown Item';
+                console.log(`✅ Item ${receipt.itemId}: ${itemName}`);
+                return {
+                    ...receipt,
+                    itemName
+                };
+            } catch (error) {
+                console.error(`❌ Error fetching item ${receipt.itemId}:`, error);
+                return {
+                    ...receipt,
+                    itemName: 'Unknown Item'
+                };
+            }
+        })
+    );
+    
+    rentedGrid.innerHTML = receiptsWithItems.map(receipt => createReceiptCard(receipt, 'rented')).join('');
+    
+    // Add filters and update counts
+    addStatusFilters();
+    updateFilterCounts(receiptsWithItems, false);
+    
+    console.log('✅ Rented receipts displayed with filters');
+}
+
 // New function to handle view item from card
 function viewItemFromCard(button) {
     const card = button.closest('.receipt-card');

@@ -2268,6 +2268,116 @@ app.post('/api/items/:itemId/return-early', async (req, res) => {
     }
 });
 
+// ==================== DEBUG ROUTE - Receipt Status Checker ====================
+
+app.get('/api/debug/receipts/:userId', async (req, res) => {
+    console.log('🔍 DEBUG: Checking receipts for user:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        // Get receipts where user is renter
+        const [renterReceipts] = await Database.pool.execute(
+            'SELECT receipt_id, item_id, status, rental_start_date, rental_end_date, rental_price, created_at, updated_at FROM receipts WHERE renter_id = ? ORDER BY created_at DESC',
+            [userId]
+        );
+        
+        // Get receipts where user is owner
+        const [ownerReceipts] = await Database.pool.execute(
+            'SELECT receipt_id, item_id, status, rental_start_date, rental_end_date, rental_price, created_at, updated_at FROM receipts WHERE owner_id = ? ORDER BY created_at DESC',
+            [userId]
+        );
+        
+        console.log('\n========== RECEIPTS DEBUG INFO ==========');
+        console.log(`User ID: ${userId}`);
+        console.log(`\n--- RENTING (User is Renter) ---`);
+        console.log(`Total: ${renterReceipts.length}`);
+        
+        renterReceipts.forEach((receipt, index) => {
+            console.log(`\nReceipt #${index + 1}:`);
+            console.log(`  Receipt ID: ${receipt.receipt_id}`);
+            console.log(`  Item ID: ${receipt.item_id}`);
+            console.log(`  STATUS: "${receipt.status}" (type: ${typeof receipt.status})`);
+            console.log(`  Start Date: ${receipt.rental_start_date}`);
+            console.log(`  End Date: ${receipt.rental_end_date}`);
+            console.log(`  Price: ₱${receipt.rental_price}`);
+            console.log(`  Created: ${receipt.created_at}`);
+            console.log(`  Updated: ${receipt.updated_at || 'N/A'}`);
+        });
+        
+        console.log(`\n--- RENTED OUT (User is Owner) ---`);
+        console.log(`Total: ${ownerReceipts.length}`);
+        
+        ownerReceipts.forEach((receipt, index) => {
+            console.log(`\nReceipt #${index + 1}:`);
+            console.log(`  Receipt ID: ${receipt.receipt_id}`);
+            console.log(`  Item ID: ${receipt.item_id}`);
+            console.log(`  STATUS: "${receipt.status}" (type: ${typeof receipt.status})`);
+            console.log(`  Start Date: ${receipt.rental_start_date}`);
+            console.log(`  End Date: ${receipt.rental_end_date}`);
+            console.log(`  Price: ₱${receipt.rental_price}`);
+            console.log(`  Created: ${receipt.created_at}`);
+            console.log(`  Updated: ${receipt.updated_at || 'N/A'}`);
+        });
+        
+        console.log('\n========================================\n');
+        
+        // Return formatted response
+        res.json({
+            success: true,
+            userId: userId,
+            summary: {
+                totalRenting: renterReceipts.length,
+                totalRentedOut: ownerReceipts.length,
+                statusBreakdown: {
+                    renting: getStatusBreakdown(renterReceipts),
+                    rentedOut: getStatusBreakdown(ownerReceipts)
+                }
+            },
+            receipts: {
+                renting: renterReceipts.map(r => ({
+                    receiptId: r.receipt_id,
+                    itemId: r.item_id,
+                    status: r.status,
+                    statusType: typeof r.status,
+                    rentalStartDate: r.rental_start_date,
+                    rentalEndDate: r.rental_end_date,
+                    rentalPrice: r.rental_price,
+                    createdAt: r.created_at,
+                    updatedAt: r.updated_at
+                })),
+                rentedOut: ownerReceipts.map(r => ({
+                    receiptId: r.receipt_id,
+                    itemId: r.item_id,
+                    status: r.status,
+                    statusType: typeof r.status,
+                    rentalStartDate: r.rental_start_date,
+                    rentalEndDate: r.rental_end_date,
+                    rentalPrice: r.rental_price,
+                    createdAt: r.created_at,
+                    updatedAt: r.updated_at
+                }))
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Debug route error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Helper function to count statuses
+function getStatusBreakdown(receipts) {
+    const breakdown = {};
+    receipts.forEach(receipt => {
+        const status = receipt.status;
+        breakdown[status] = (breakdown[status] || 0) + 1;
+    });
+    return breakdown;
+}
+
 // ==================== START SERVER ====================
 
 app.listen(PORT, () => {

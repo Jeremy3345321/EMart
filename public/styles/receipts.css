@@ -718,3 +718,229 @@ body {
     background-color: #fff3cd;
     color: #856404;
 }
+
+/* Add this to your receipts.css for the new status */
+
+.status-returned_early,
+.status-returned-early {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Also update modal status badge */
+.modal-status-badge.status-returned_early,
+.modal-status-badge.status-returned-early {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Status Filters Container */
+.status-filters {
+    display: flex;
+    gap: 12px;
+    margin: 24px 0;
+    padding: 16px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.status-filters::-webkit-scrollbar {
+    height: 6px;
+}
+
+.status-filters::-webkit-scrollbar-track {
+    background: #f5f5f5;
+    border-radius: 3px;
+}
+
+.status-filters::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 3px;
+}
+
+.status-filters::-webkit-scrollbar-thumb:hover {
+    background: #b0b0b0;
+}
+
+/* Status Filter Buttons */
+.status-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #f5f5f5;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.status-filter-btn:hover {
+    background: #e8e8e8;
+    transform: translateY(-1px);
+}
+
+.status-filter-btn.active {
+    background: #3498db;
+    color: white;
+    border-color: #2980b9;
+}
+
+/* Filter Count Badge */
+.filter-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.status-filter-btn.active .filter-count {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.filter-count.has-items {
+    animation: pulse 0.5s ease-out;
+}
+
+/* Filter Empty Message */
+.filter-empty-message {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: #95a5a6;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.filter-empty-message h3 {
+    font-size: 20px;
+    color: #7f8c8d;
+    margin: 16px 0 8px;
+}
+
+.filter-empty-message p {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* Specific button colors based on status */
+.status-filter-btn[data-status="active"].active {
+    background: #27ae60;
+    border-color: #229954;
+}
+
+.status-filter-btn[data-status="completed"].active {
+    background: #3498db;
+    border-color: #2980b9;
+}
+
+.status-filter-btn[data-status="returned_early"].active {
+    background: #f39c12;
+    border-color: #e67e22;
+}
+
+.status-filter-btn[data-status="cancelled"].active {
+    background: #e74c3c;
+    border-color: #c0392b;
+}
+
+.status-filter-btn[data-status="pending_payment"].active {
+    background: #9b59b6;
+    border-color: #8e44ad;
+}
+
+/* Hover colors for non-active buttons */
+.status-filter-btn[data-status="active"]:not(.active):hover {
+    background: #d5f4e6;
+    color: #27ae60;
+}
+
+.status-filter-btn[data-status="completed"]:not(.active):hover {
+    background: #d6eaf8;
+    color: #3498db;
+}
+
+.status-filter-btn[data-status="returned_early"]:not(.active):hover {
+    background: #fef5e7;
+    color: #f39c12;
+}
+
+.status-filter-btn[data-status="cancelled"]:not(.active):hover {
+    background: #fadbd8;
+    color: #e74c3c;
+}
+
+.status-filter-btn[data-status="pending_payment"]:not(.active):hover {
+    background: #ebdef0;
+    color: #9b59b6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .status-filters {
+        padding: 12px;
+        gap: 8px;
+    }
+    
+    .status-filter-btn {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    
+    .filter-count {
+        min-width: 20px;
+        height: 20px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .status-filters {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+    }
+    
+    .status-filter-btn {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+}
