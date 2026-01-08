@@ -1,4 +1,4 @@
-// cart-manager.js - Database-backed Cart Management Utility
+// cart-manager.js - Fixed with imageUrl mapping
 
 class CartManager {
     constructor() {
@@ -34,6 +34,7 @@ class CartManager {
                     owner: cartItem.item.ownerName,
                     ownerId: cartItem.item.ownerId,
                     condition: cartItem.item.condition,
+                    imageUrl: cartItem.item.imageUrl, // ✅ ADDED: Map imageUrl from item
                     quantity: cartItem.quantity,
                     isRenting: cartItem.item.isRenting,
                     isRented: cartItem.item.isRented,

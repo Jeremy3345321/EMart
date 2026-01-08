@@ -2268,7 +2268,209 @@ app.post('/api/items/:itemId/return-early', async (req, res) => {
     }
 });
 
-// ==================== DEBUG ROUTE - Receipt Status Checker ====================
+// ==================== DEBUG ROUTE ====================
+
+app.get('/api/cart/:userId/debug', async (req, res) => {
+    console.log('🔍 [DEBUG CART] User:', req.params.userId);
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+        
+        const cartItems = await Database.getCart(userId);
+        
+        // Create detailed debug info
+        const debugInfo = {
+            userId: userId,
+            cartItemCount: cartItems.length,
+            cartItems: cartItems.map((cartItem, index) => ({
+                index: index,
+                cartItemId: cartItem.cartItemId || 'N/A',
+                itemId: cartItem.itemId || 'N/A',
+                quantity: cartItem.quantity || 'N/A',
+                addedAt: cartItem.addedAt || 'N/A',
+                item: {
+                    exists: !!cartItem.item,
+                    itemId: cartItem.item?.itemId || 'N/A',
+                    itemName: cartItem.item?.itemName || 'N/A',
+                    ownerId: cartItem.item?.ownerId || 'N/A',
+                    ownerName: cartItem.item?.ownerName || 'N/A',
+                    price: cartItem.item?.price || 'N/A',
+                    condition: cartItem.item?.condition || 'N/A',
+                    imageUrl: cartItem.item?.imageUrl || 'NULL/EMPTY',
+                    imageUrlLength: cartItem.item?.imageUrl?.length || 0,
+                    isRenting: cartItem.item?.isRenting || false,
+                    isRented: cartItem.item?.isRented || false,
+                    tags: cartItem.item?.tags || [],
+                    allFields: Object.keys(cartItem.item || {})
+                },
+                rawCartItem: cartItem
+            }))
+        };
+        
+        console.log(`✅ [DEBUG CART] Sending debug info for ${cartItems.length} items`);
+        
+        // Send as formatted HTML for easy viewing in browser
+        const htmlResponse = `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cart Debug - User ${userId}</title>
+    <style>
+        body { 
+            font-family: 'Courier New', monospace; 
+            padding: 20px; 
+            background: #1e1e1e; 
+            color: #d4d4d4; 
+        }
+        h1 { color: #4ec9b0; }
+        h2 { color: #569cd6; margin-top: 30px; }
+        h3 { color: #dcdcaa; margin-top: 20px; }
+        .summary { 
+            background: #252526; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 20px;
+            border-left: 4px solid #4ec9b0;
+        }
+        .item { 
+            background: #252526; 
+            padding: 15px; 
+            margin: 15px 0; 
+            border-radius: 5px;
+            border-left: 4px solid #569cd6;
+        }
+        .field { 
+            margin: 8px 0; 
+            padding: 5px; 
+        }
+        .label { 
+            color: #9cdcfe; 
+            font-weight: bold; 
+        }
+        .value { 
+            color: #ce9178; 
+        }
+        .null { 
+            color: #f44747; 
+            font-weight: bold; 
+        }
+        .warning { 
+            background: #3d2600; 
+            border-left-color: #ff9800; 
+            color: #ff9800;
+        }
+        .success { 
+            background: #1e3a1e; 
+            border-left-color: #4caf50; 
+            color: #4caf50;
+        }
+        pre { 
+            background: #1e1e1e; 
+            padding: 10px; 
+            border-radius: 3px; 
+            overflow-x: auto;
+            border: 1px solid #3e3e42;
+        }
+        .image-preview {
+            margin-top: 10px;
+            max-width: 200px;
+            border: 2px solid #569cd6;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Cart Debug Information</h1>
+    
+    <div class="summary ${cartItems.length === 0 ? 'warning' : 'success'}">
+        <h2>Summary</h2>
+        <div class="field"><span class="label">User ID:</span> <span class="value">${userId}</span></div>
+        <div class="field"><span class="label">Cart Items:</span> <span class="value">${cartItems.length}</span></div>
+    </div>
+    
+    ${cartItems.length === 0 ? '<div class="item warning"><h3>⚠️ Cart is Empty</h3></div>' : ''}
+    
+    ${debugInfo.cartItems.map(item => `
+        <div class="item">
+            <h3>Item #${item.index + 1}: ${item.item.itemName}</h3>
+            
+            <h4 style="color: #4ec9b0;">Cart Entry Data:</h4>
+            <div class="field"><span class="label">Cart Item ID:</span> <span class="value">${item.cartItemId}</span></div>
+            <div class="field"><span class="label">Item ID:</span> <span class="value">${item.itemId}</span></div>
+            <div class="field"><span class="label">Quantity:</span> <span class="value">${item.quantity}</span></div>
+            <div class="field"><span class="label">Added At:</span> <span class="value">${item.addedAt}</span></div>
+            
+            <h4 style="color: #4ec9b0;">Item Details:</h4>
+            <div class="field"><span class="label">Item Exists:</span> <span class="value">${item.item.exists ? '✅ Yes' : '❌ No'}</span></div>
+            <div class="field"><span class="label">Item Name:</span> <span class="value">${item.item.itemName}</span></div>
+            <div class="field"><span class="label">Owner ID:</span> <span class="value">${item.item.ownerId}</span></div>
+            <div class="field"><span class="label">Owner Name:</span> <span class="value">${item.item.ownerName}</span></div>
+            <div class="field"><span class="label">Price:</span> <span class="value">₱${item.item.price}</span></div>
+            <div class="field"><span class="label">Condition:</span> <span class="value">${item.item.condition}</span></div>
+            <div class="field"><span class="label">Is Renting:</span> <span class="value">${item.item.isRenting}</span></div>
+            <div class="field"><span class="label">Is Rented:</span> <span class="value">${item.item.isRented}</span></div>
+            <div class="field"><span class="label">Tags:</span> <span class="value">${JSON.stringify(item.item.tags)}</span></div>
+            
+            <h4 style="color: ${item.item.imageUrl === 'NULL/EMPTY' ? '#f44747' : '#4ec9b0'};">Image URL Status:</h4>
+            <div class="field">
+                <span class="label">Image URL:</span> 
+                <span class="${item.item.imageUrl === 'NULL/EMPTY' ? 'null' : 'value'}">
+                    ${item.item.imageUrl === 'NULL/EMPTY' ? '❌ NULL/EMPTY' : item.item.imageUrl}
+                </span>
+            </div>
+            <div class="field"><span class="label">URL Length:</span> <span class="value">${item.item.imageUrlLength} characters</span></div>
+            
+            ${item.item.imageUrl !== 'NULL/EMPTY' ? `
+                <div class="field">
+                    <span class="label">Image Preview:</span><br>
+                    <img src="${item.item.imageUrl}" 
+                         class="image-preview" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                         alt="Item Image">
+                    <div style="display:none; color: #f44747; margin-top: 10px;">❌ Image failed to load</div>
+                </div>
+            ` : ''}
+            
+            <h4 style="color: #4ec9b0;">Available Fields in Item Object:</h4>
+            <div class="field"><span class="value">${item.item.allFields.join(', ')}</span></div>
+            
+            <details style="margin-top: 15px;">
+                <summary style="cursor: pointer; color: #569cd6;">View Raw JSON Data</summary>
+                <pre>${JSON.stringify(item.rawCartItem, null, 2)}</pre>
+            </details>
+        </div>
+    `).join('')}
+    
+    <div class="item">
+        <h3>📋 Full Raw JSON Response</h3>
+        <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
+    </div>
+    
+</body>
+</html>
+        `;
+        
+        res.send(htmlResponse);
+        
+    } catch (error) {
+        console.error('❌ [DEBUG CART] Error:', error.message);
+        res.status(500).send(`
+            <html>
+            <body style="font-family: monospace; padding: 20px; background: #1e1e1e; color: #f44747;">
+                <h1>❌ Debug Cart Error</h1>
+                <p>Error: ${error.message}</p>
+                <pre>${error.stack}</pre>
+            </body>
+            </html>
+        `);
+    }
+});
 
 app.get('/api/debug/receipts/:userId', async (req, res) => {
     console.log('🔍 DEBUG: Checking receipts for user:', req.params.userId);

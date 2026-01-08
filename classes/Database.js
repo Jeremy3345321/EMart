@@ -760,6 +760,7 @@ class Database {
         try {
             await this.initialize();
             
+            // ✅ FIXED: Use correct column name 'cart_id' instead of 'cart_item_id'
             const [rows] = await this.pool.execute(
                 `SELECT 
                     c.cart_id,
@@ -767,48 +768,78 @@ class Database {
                     c.item_id,
                     c.quantity,
                     c.added_at,
-                    c.updated_at,
+                    i.item_id,
                     i.item_name,
                     i.owner_id,
+                    i.renter_id,
+                    i.item_image_url,
+                    i.item_description,
                     i.item_price,
                     i.item_condition,
-                    i.item_description,
                     i.item_tags,
                     i.is_renting,
                     i.is_rented,
+                    i.item_rating,
+                    i.rating_count,
+                    i.total_rating_points,
+                    i.rental_duration,
+                    i.rental_duration_unit,
+                    i.min_rental_duration,
+                    i.max_rental_duration,
                     u.user_name as owner_name
                 FROM cart c
-                INNER JOIN items i ON c.item_id = i.item_id
-                INNER JOIN users u ON i.owner_id = u.user_id
+                JOIN items i ON c.item_id = i.item_id
+                JOIN users u ON i.owner_id = u.user_id
                 WHERE c.user_id = ?
                 ORDER BY c.added_at DESC`,
                 [userId]
             );
             
-            console.log(`🛒 Found ${rows.length} items in cart for user ${userId}`);
+            console.log(`✅ [Database.getCart] Retrieved ${rows.length} cart items for user ${userId}`);
             
+            // Log each row to verify imageUrl is present
+            rows.forEach((row, index) => {
+                console.log(`📦 Cart Item ${index + 1}:`);
+                console.log(`   - Item Name: ${row.item_name}`);
+                console.log(`   - Image URL exists: ${!!row.item_image_url}`);
+                console.log(`   - Image URL length: ${(row.item_image_url || '').length} chars`);
+                if (row.item_image_url) {
+                    console.log(`   - Image URL preview: ${row.item_image_url.substring(0, 50)}...`);
+                }
+            });
+            
+            // Map rows to cart item objects with COMPLETE item data including imageUrl
             return rows.map(row => ({
-                cartId: row.cart_id,
+                cartItemId: row.cart_id, 
                 userId: row.user_id,
                 itemId: row.item_id,
                 quantity: row.quantity,
                 addedAt: row.added_at,
-                updatedAt: row.updated_at,
                 item: {
+                    itemId: row.item_id,
                     itemName: row.item_name,
                     ownerId: row.owner_id,
                     ownerName: row.owner_name,
-                    price: parseFloat(row.item_price),
-                    condition: row.item_condition,
-                    description: row.item_description,
-                    imageUrl: null, // Set to null since column doesn't exist yet
+                    renterId: row.renter_id,
+                    imageUrl: row.item_image_url, 
+                    description: row.item_description || '',
+                    price: parseFloat(row.item_price) || 0,
+                    condition: row.item_condition || 'Like New',
                     tags: row.item_tags ? JSON.parse(row.item_tags) : [],
-                    isRenting: row.is_renting,
-                    isRented: row.is_rented
+                    isRenting: Boolean(row.is_renting),
+                    isRented: Boolean(row.is_rented),
+                    rating: row.item_rating,
+                    ratingCount: row.rating_count || 0,
+                    totalRatingPoints: row.total_rating_points || 0,
+                    rentalDuration: row.rental_duration || 1,
+                    rentalDurationUnit: row.rental_duration_unit || 'day',
+                    minRentalDuration: row.min_rental_duration,
+                    maxRentalDuration: row.max_rental_duration
                 }
             }));
+            
         } catch (error) {
-            console.error('❌ Error getting cart:', error.message);
+            console.error('❌ [Database.getCart] Error:', error.message);
             throw error;
         }
     }

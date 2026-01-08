@@ -1,4 +1,4 @@
-// cart.js - Complete version with Stripe payment integration
+// cart.js - Fixed version with proper image display
 
 const currentUser = JSON.parse(sessionStorage.getItem('currentUser'));
 const API_URL = 'http://localhost:3000/api';
@@ -89,11 +89,20 @@ async function renderCart() {
     
     cartItemsContainer.innerHTML = cart.map(cartItem => {
         console.log('📋 Cart item:', cartItem);
+        
+        // Check if imageUrl exists and is not empty
+        const hasImage = cartItem.imageUrl && cartItem.imageUrl.trim() !== '';
+        
         return `
             <div class="cart-item" data-item-id="${cartItem.id}">
                 <div class="item-image">
-                    ${cartItem.item?.imageUrl && cartItem.item.imageUrl.trim() !== '' 
-                        ? `<img src="${cartItem.item.imageUrl}" alt="${cartItem.name}">` 
+                    ${hasImage
+                        ? `<img src="${cartItem.imageUrl}" alt="${cartItem.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                           <svg style="display: none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                               <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                               <polyline points="21 15 16 10 5 21"></polyline>
+                           </svg>` 
                         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
@@ -229,7 +238,7 @@ async function checkout() {
                         rentalStartDate: rentalStartDate.toISOString(),
                         rentalEndDate: rentalEndDate.toISOString(),
                         rentalPrice: cartItem.price,
-                        status: 'pending_payment' // IMPORTANT: pending until paid
+                        status: 'pending_payment'
                     })
                 });
                 
