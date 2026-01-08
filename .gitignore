@@ -6,6 +6,8 @@ logs
 *.log
 npm-debug.log*
 
+.env
+
 # OS files
 .DS_Store
 Thumbs.db
