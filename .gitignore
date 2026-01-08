@@ -1,11 +1,6 @@
 # .gitignore - Create this in your project root
 # This tells Git which files to ignore (not upload to GitHub)
 
-# Environment variables (CONTAINS SECRETS!)
-.env
-.env.local
-.env.*.local
-
 # Logs
 logs
 *.log

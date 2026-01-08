@@ -157,9 +157,6 @@ clearCartBtn.addEventListener('click', async function() {
     }
 });
 
-// ========================================
-// UPDATED CHECKOUT WITH STRIPE PAYMENT
-// ========================================
 async function checkout() {
     console.log('💳 Starting checkout...');
     
@@ -173,18 +170,55 @@ async function checkout() {
     checkoutBtn.innerHTML = '<span>Processing...</span>';
     
     try {
-        const rentalStartDate = new Date();
-        const rentalEndDate = new Date();
-        rentalEndDate.setDate(rentalEndDate.getDate() + 7);
-        
         const receipts = [];
         
-        // Step 1: Create receipts with 'pending_payment' status
-        console.log('📝 Creating receipts...');
+        // Step 1: Create receipts with proper rental durations
+        console.log('📝 Creating receipts with item-specific rental durations...');
+        
         for (const cartItem of cart) {
             try {
                 console.log(`Creating receipt for: ${cartItem.name}`);
                 
+                // Fetch item details to get actual rental duration
+                const itemResponse = await fetch(`${API_URL}/items/${cartItem.id}`);
+                const itemData = await itemResponse.json();
+                
+                if (!itemData.success) {
+                    throw new Error(`Failed to fetch item details for ${cartItem.name}`);
+                }
+                
+                const item = itemData.data;
+                
+                // Calculate rental dates based on item's rental duration
+                const rentalStartDate = new Date();
+                const rentalEndDate = new Date();
+                
+                // Add the appropriate duration based on the item's duration unit
+                switch(item.rentalDurationUnit) {
+                    case 'hour':
+                        rentalEndDate.setHours(rentalEndDate.getHours() + item.rentalDuration);
+                        break;
+                    case 'day':
+                        rentalEndDate.setDate(rentalEndDate.getDate() + item.rentalDuration);
+                        break;
+                    case 'week':
+                        rentalEndDate.setDate(rentalEndDate.getDate() + (item.rentalDuration * 7));
+                        break;
+                    case 'month':
+                        rentalEndDate.setMonth(rentalEndDate.getMonth() + item.rentalDuration);
+                        break;
+                    default:
+                        // Default to days if unit is not recognized
+                        rentalEndDate.setDate(rentalEndDate.getDate() + item.rentalDuration);
+                }
+                
+                console.log(`📅 Rental period for ${cartItem.name}:`, {
+                    duration: `${item.rentalDuration} ${item.rentalDurationUnit}(s)`,
+                    start: rentalStartDate.toISOString(),
+                    end: rentalEndDate.toISOString()
+                });
+                
+                // Create receipt with calculated dates
                 const receiptResponse = await fetch(`${API_URL}/receipts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -209,10 +243,13 @@ async function checkout() {
                     receiptId: receiptData.data.receiptId,
                     itemId: cartItem.id,
                     itemName: cartItem.name,
-                    amount: cartItem.price
+                    amount: cartItem.price,
+                    rentalDuration: `${item.rentalDuration} ${item.rentalDurationUnit}(s)`,
+                    startDate: rentalStartDate,
+                    endDate: rentalEndDate
                 });
                 
-                console.log(`✅ Receipt created: ${receiptData.data.receiptId}`);
+                console.log(`✅ Receipt created: ${receiptData.data.receiptId} with proper duration`);
                 
             } catch (error) {
                 console.error(`Error creating receipt for ${cartItem.name}:`, error);

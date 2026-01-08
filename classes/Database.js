@@ -603,6 +603,29 @@ class Database {
         }
     }
 
+    static async updateReceiptStatus(receiptId, status) {
+        try {
+            await this.initialize();
+            
+            // Valid statuses including returned_early
+            const validStatuses = ['pending_payment', 'active', 'completed', 'cancelled', 'returned_early'];
+            
+            if (!validStatuses.includes(status)) {
+                throw new Error(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+            }
+            
+            await this.pool.execute(
+                'UPDATE receipts SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE receipt_id = ?',
+                [status, receiptId]
+            );
+            console.log(`✅ Receipt status updated: ${receiptId} -> ${status}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Error updating receipt status:', error.message);
+            throw error;
+        }
+    }
+
     static async getReceiptsByOwner(ownerId) {
         try {
             await this.initialize();

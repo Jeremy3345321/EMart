@@ -705,3 +705,16 @@ body {
         font-size: 18px;
     }
 }
+
+.status-returned_early,
+.status-returned-early {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Also update modal status badge */
+.modal-status-badge.status-returned_early,
+.modal-status-badge.status-returned-early {
+    background-color: #fff3cd;
+    color: #856404;
+}

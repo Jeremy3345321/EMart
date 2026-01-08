@@ -2111,6 +2111,162 @@ app.post('/api/webhooks/stripe', express.raw({type: 'application/json'}), async 
     }
 });
 
+// ==================== EARLY RETURN WITH REFUND ====================
+
+// Return item early with refund calculation
+app.post('/api/items/:itemId/return-early', async (req, res) => {
+    console.log('🔙 Processing early return for item:', req.params.itemId);
+    try {
+        const { itemId } = req.params;
+        const { receiptId, refundAmount, percentageCompleted, returnedBy } = req.body;
+
+        // Validate input
+        if (!receiptId || refundAmount === undefined || !returnedBy) {
+            return res.status(400).json({
+                success: false,
+                message: 'Receipt ID, refund amount, and user ID are required'
+            });
+        }
+
+        // Get the receipt
+        const receipt = await Database.getReceiptById(receiptId);
+        if (!receipt) {
+            return res.status(404).json({
+                success: false,
+                message: 'Receipt not found'
+            });
+        }
+
+        // Get the item
+        const item = await Database.getItemById(itemId);
+        if (!item) {
+            return res.status(404).json({
+                success: false,
+                message: 'Item not found'
+            });
+        }
+
+        // Check if item is actually rented
+        if (!item.isRented) {
+            return res.status(400).json({
+                success: false,
+                message: 'Item is not currently rented'
+            });
+        }
+
+        // Verify the user returning is the renter
+        if (receipt.renterId !== returnedBy) {
+            return res.status(403).json({
+                success: false,
+                message: 'Only the renter can return this item'
+            });
+        }
+
+        console.log('💰 Processing early return with refund details:', {
+            receiptId,
+            itemId,
+            totalPaid: receipt.rentalPrice,
+            refundAmount,
+            percentageCompleted: percentageCompleted.toFixed(2) + '%'
+        });
+
+        // Update item status
+        item.setRenterId(null);
+        item.isRented = false;
+        await Database.updateItem(item);
+
+        // Update receipt status to 'returned_early'
+        await Database.updateReceiptStatus(receiptId, 'returned_early');
+
+        // Process refund if applicable
+        if (refundAmount > 0) {
+            console.log(`💸 Processing refund of ₱${refundAmount.toFixed(2)} to renter`);
+            
+            try {
+                // Call payment service to process refund
+                const refundResult = await PaymentService.processRefund(
+                    receiptId,
+                    'early_return',
+                    refundAmount
+                );
+                
+                console.log('✅ Refund processed:', refundResult);
+            } catch (refundError) {
+                console.error('⚠️ Refund processing error:', refundError);
+                // Continue even if refund fails - we'll handle it manually
+            }
+        }
+
+        // Get owner and renter info for notifications
+        const owner = await Database.getUserById(receipt.ownerId);
+        const renter = await Database.getUserById(receipt.renterId);
+
+        // Create notifications for both parties
+        const Notification = require('./classes/Notification');
+
+        // Notification for RENTER
+        const renterNotification = new Notification();
+        renterNotification.setUserId(receipt.renterId);
+        renterNotification.setType('rental_ended');
+        renterNotification.setTitle('Item Returned Early');
+        
+        if (refundAmount > 0) {
+            renterNotification.setMessage(
+                `You've successfully returned "${item.getItemName()}" early. ` +
+                `A refund of ₱${refundAmount.toFixed(2)} will be processed within 5-10 business days.`
+            );
+        } else {
+            renterNotification.setMessage(
+                `You've successfully returned "${item.getItemName()}" early. ` +
+                `No refund applicable as more than 25% of the rental period elapsed.`
+            );
+        }
+        
+        renterNotification.setItemId(itemId);
+        renterNotification.setRelatedUserId(receipt.ownerId);
+        await Database.addNotification(renterNotification);
+
+        // Notification for OWNER
+        const ownerNotification = new Notification();
+        ownerNotification.setUserId(receipt.ownerId);
+        ownerNotification.setType('item_returned');
+        ownerNotification.setTitle('Item Returned Early! 📦');
+        
+        const ownerAmount = parseFloat(receipt.rentalPrice) - refundAmount;
+        ownerNotification.setMessage(
+            `${renter.getUserName()} has returned "${item.getItemName()}" early. ` +
+            `You'll receive ₱${ownerAmount.toFixed(2)} for this rental.`
+        );
+        
+        ownerNotification.setItemId(itemId);
+        ownerNotification.setRelatedUserId(receipt.renterId);
+        await Database.addNotification(ownerNotification);
+
+        console.log('✅ Early return processed successfully');
+        console.log('📬 Notifications sent to both parties');
+
+        res.json({
+            success: true,
+            message: 'Item returned successfully',
+            data: {
+                itemId: item.getItemId(),
+                itemName: item.getItemName(),
+                refundAmount: refundAmount,
+                percentageCompleted: percentageCompleted,
+                isRented: item.isRented,
+                notificationsSent: true
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Early return error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+});
 
 // ==================== START SERVER ====================
 

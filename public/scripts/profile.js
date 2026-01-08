@@ -651,62 +651,103 @@ window.closeItemViewModal = function() {
     }
 };
 
-// Return item early
+// Return item early - FIXED VERSION with refund logic
 window.returnItemEarly = async function(receiptId, itemId) {
-    if (!confirm('Are you sure you want to return this item early? This action cannot be undone.')) {
-        return;
-    }
-    
-    console.log('🔄 Returning item early - Receipt:', receiptId, 'Item:', itemId);
+    console.log('🔄 Processing early return - Receipt:', receiptId, 'Item:', itemId);
     
     try {
-        // Update receipt status to completed
-        const receiptResponse = await fetch(`${API_URL}/receipts/${receiptId}/status`, {
-            method: 'PUT',
+        // First, get the receipt details to calculate refund
+        const receiptResponse = await fetch(`${API_URL}/receipts/${receiptId}`);
+        const receiptData = await receiptResponse.json();
+        
+        if (!receiptData.success) {
+            alert('Failed to load receipt details');
+            return;
+        }
+        
+        const receipt = receiptData.data;
+        
+        // Calculate rental progress
+        const startDate = new Date(receipt.rentalStartDate);
+        const endDate = new Date(receipt.rentalEndDate);
+        const now = new Date();
+        
+        const totalDuration = endDate - startDate; // in milliseconds
+        const elapsedDuration = now - startDate; // in milliseconds
+        const percentageCompleted = (elapsedDuration / totalDuration) * 100;
+        
+        console.log('📊 Rental Progress:', {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            now: now.toISOString(),
+            percentageCompleted: percentageCompleted.toFixed(2) + '%'
+        });
+        
+        // Calculate refund amount
+        let refundAmount = 0;
+        let ownerAmount = parseFloat(receipt.rentalPrice);
+        let refundMessage = '';
+        
+        if (percentageCompleted < 25) {
+            // Less than 25% complete: Renter gets 50% refund
+            refundAmount = (parseFloat(receipt.rentalPrice) * 0.5);
+            ownerAmount = (parseFloat(receipt.rentalPrice) * 0.5);
+            refundMessage = `You will receive a 50% refund (₱${refundAmount.toFixed(2)}) since you're returning within the first 25% of the rental period.\n\n` +
+                          `Amount to refund: ₱${refundAmount.toFixed(2)}\n` +
+                          `Amount owner keeps: ₱${ownerAmount.toFixed(2)}`;
+        } else {
+            // More than 25% complete: No refund
+            refundMessage = `No refund will be issued as more than 25% of the rental period has elapsed.\n\n` +
+                          `The owner will receive the full rental amount: ₱${ownerAmount.toFixed(2)}`;
+        }
+        
+        // Show confirmation dialog with refund details
+        const confirmMessage = `Are you sure you want to return this item early?\n\n${refundMessage}\n\nThis action cannot be undone.`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        console.log('💰 Processing refund:', {
+            totalPaid: receipt.rentalPrice,
+            refundAmount: refundAmount,
+            ownerKeeps: ownerAmount,
+            percentageCompleted: percentageCompleted.toFixed(2) + '%'
+        });
+        
+        // Process the return and refund
+        const returnResponse = await fetch(`${API_URL}/items/${itemId}/return-early`, {
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ status: 'completed' })
+            body: JSON.stringify({
+                receiptId: receiptId,
+                refundAmount: refundAmount,
+                percentageCompleted: percentageCompleted,
+                returnedBy: currentUser.userId
+            })
         });
         
-        const receiptResult = await receiptResponse.json();
+        const returnResult = await returnResponse.json();
         
-        if (receiptResult.success) {
-            // Update item to be available again
-            const itemResponse = await fetch(`${API_URL}/items/${itemId}`);
-            const itemData = await itemResponse.json();
-            
-            if (itemData.success) {
-                const item = itemData.data;
-                
-                const updateResponse = await fetch(`${API_URL}/items/${itemId}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        ...item,
-                        isRented: false,
-                        renterId: null
-                    })
-                });
-                
-                const updateResult = await updateResponse.json();
-                
-                if (updateResult.success) {
-                    alert('Item returned successfully!');
-                    closeItemViewModal();
-                    // Reload the page to refresh all data
-                    window.location.reload();
-                } else {
-                    alert('Failed to update item availability');
-                }
+        if (returnResult.success) {
+            // Show success message with refund details
+            if (refundAmount > 0) {
+                alert(`✅ Item returned successfully!\n\nRefund of ₱${refundAmount.toFixed(2)} will be processed within 5-10 business days.\n\nNotifications have been sent to you and the owner.`);
+            } else {
+                alert(`✅ Item returned successfully!\n\nThe owner has received the full rental amount.\n\nNotifications have been sent to you and the owner.`);
             }
+            
+            closeItemViewModal();
+            // Reload the page to refresh all data
+            window.location.reload();
         } else {
-            alert('Failed to return item: ' + receiptResult.message);
+            alert('Failed to return item: ' + returnResult.message);
         }
+        
     } catch (error) {
-        console.error('Error returning item:', error);
+        console.error('❌ Error returning item:', error);
         alert('Failed to return item. Please try again.');
     }
 };
